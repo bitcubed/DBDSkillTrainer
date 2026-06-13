@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DBD Skill-Check Trainer</title>
+</head>
+<body>
+<div class="wrap">
+<div class="layout">
+<div class="main">
+
+  <!-- A mode picker, not a tab panel: radio semantics fit (no roving-focus pattern needed). -->
+  <div class="tabs" id="tabs" role="radiogroup" aria-label="Skill-check mode">
+    <div class="tab on" data-mode="gen" role="radio" tabindex="0" aria-checked="true">Generator</div>
+    <div class="tab" data-mode="doctor" role="radio" tabindex="0" aria-checked="false">Doctor</div>
+    <div class="tab" data-mode="special" role="radio" tabindex="0" aria-checked="false">Special</div>
+  </div>
+
+  <div class="row specialrow" id="specialRow">
+    <span class="cap">Check type</span>
+    <select id="specialSel" aria-label="Special check type">
+      <option value="ds">Decisive Strike</option>
+      <option value="oc1">Overcharge I</option>
+      <option value="oc2">Overcharge II</option>
+      <option value="oc3">Overcharge III</option>
+      <option value="opp">Oppression</option>
+      <option value="bnp">Brand New Part</option>
+      <option value="snap">Snap Out of It</option>
+    </select>
+  </div>
+
+  <div class="stage" id="stage">
+    <canvas id="bgnoise" aria-hidden="true"></canvas>
+    <canvas id="cv" aria-hidden="true"></canvas>
+    <div id="perkTags"></div>
+    <div id="stormTag">MERCILESS STORM</div>
+    <div id="progHud">
+      <div class="ph-top">
+        <span id="phSeg">1/5 · WARM-UP</span>
+        <span id="phClock">5:00</span>
+      </div>
+      <div class="ph-trains" id="phTrains">Find your rhythm</div>
+      <div class="ph-bar"><div class="ph-fill" id="phFill"></div></div>
+    </div>
+    <div id="flash"><div id="flashMain"></div><div id="flashSub"></div></div>
+    <div id="hint">SPACE or LEFT CLICK anywhere to hit</div>
+  </div>
+
+  <div class="progwrap" id="progwrap">
+    <div class="proghead"><span class="cap" id="progLabel">Generator</span><span class="val" id="progVal">0.0%</span></div>
+    <div class="pbar"><div class="pfill" id="pfill"></div></div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="v gold" id="sGreat">0</div><div class="k">Greats</div></div>
+    <div class="stat"><div class="v" id="sGood">0</div><div class="k">Goods</div></div>
+    <div class="stat"><div class="v red" id="sMiss">0</div><div class="k">Misses</div></div>
+    <div class="stat"><div class="v" id="sGreatPct">–</div><div class="k">Great rate</div></div>
+    <div class="stat"><div class="v" id="sStreak">0 / 0</div><div class="k">Streak / best</div></div>
+    <div class="stat"><div class="v" id="sWindow">–</div><div class="k">Great window</div></div>
+  </div>
+
+  <div class="tape">
+    <div class="tapehead"><span class="cap">Timing — last 24 presses (0 = great-zone center)</span><span id="tapeRead">no presses yet</span></div>
+    <canvas id="tapeCv" aria-hidden="true"></canvas>
+  </div>
+
+  <div class="ctrls">
+    <button class="btn primary" id="startBtn">Start</button>
+    <button class="btn program" id="progBtn">▶ 5-Min Program</button>
+    <button class="btn" id="resetBtn">Reset stats</button>
+    <button class="btn" id="dashBtn">Progress</button>
+    <span class="cap" style="margin-left:4px">Pacing</span>
+    <select id="pacingSel" aria-label="Pacing">
+      <option value="drill">Drill — back to back</option>
+      <option value="realistic">Realistic — game odds</option>
+    </select>
+    <span class="cap" style="margin-left:4px">Input</span>
+    <select id="inputSel" aria-label="Input mode">
+      <option value="both">Space + left click</option>
+      <option value="mouse">Left click only</option>
+      <option value="space">Space only</option>
+    </select>
+  </div>
+
+  <div class="progResults" id="progResults"></div>
+
+  <div id="dashboard"></div>
+
+  <div class="chips" id="chips">
+    <div class="chip" id="cHF" tabindex="0" role="button" aria-pressed="false">Hyperfocus <span class="tok" id="hfTok"></span></div>
+    <div class="chip" id="cSO" tabindex="0" role="button" aria-pressed="false">Stake Out <span class="tok" id="soTok"></span></div>
+    <div class="chip" id="cUP" tabindex="0" role="button" aria-pressed="false">Unnerving <span class="tok" id="upTok">off</span></div>
+    <div class="chip" id="cLB" tabindex="0" role="button" aria-pressed="false">Lullaby <span class="tok" id="lbTok">0</span></div>
+    <div class="chip" id="cTB" tabindex="0" role="button" aria-pressed="false">Toolbox</div>
+    <div class="chip" id="cMS" tabindex="0" role="button" aria-pressed="false">Merciless Storm</div>
+    <div class="chip" id="cBG" tabindex="0" role="button" aria-pressed="false">BG Noise <span class="tok" id="bgTok">off</span></div>
+  </div>
+
+  <div class="sliders">
+    <div class="sl"><div class="lab"><span>Pointer speed</span><b id="vSpeed">1.00×</b></div>
+      <input type="range" id="rSpeed" min="50" max="150" value="100" aria-label="Pointer speed"></div>
+    <div class="sl"><div class="lab"><span>Zone size</span><b id="vZone">1.00×</b></div>
+      <input type="range" id="rZone" min="40" max="200" value="100" aria-label="Zone size"></div>
+    <div class="sl"><div class="lab"><span>Warning lead (approx.)</span><b id="vWarn">500 ms</b></div>
+      <input type="range" id="rWarn" min="0" max="1000" value="500" step="25" aria-label="Warning lead"></div>
+    <div class="sl"><div class="lab"><span>Volume</span><b id="vVol">60%</b></div>
+      <input type="range" id="rVol" min="0" max="100" value="60" aria-label="Volume"></div>
+  </div>
+
+  <div class="chips display" id="displayChips">
+    <div class="chip" id="cRM" tabindex="0" role="button" aria-pressed="false">Reduced Motion <span class="tok" id="rmTok">off</span></div>
+    <div class="chip" id="cCB" tabindex="0" role="button" aria-pressed="false">Colorblind-safe <span class="tok" id="cbTok">off</span></div>
+  </div>
+
+  <div class="foot" id="footNote"></div>
+
+</div><!-- /.main -->
+
+<aside class="guide" id="guide"></aside>
+
+</div><!-- /.layout -->
+</div><!-- /.wrap -->
+
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>

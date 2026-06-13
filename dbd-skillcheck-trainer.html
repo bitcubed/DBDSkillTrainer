@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skill Check Trainer</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12161b; --panel2:#171c22; --line:#262d35;
+    --ink:#e8ecea; --mut:#8b949c; --dim:#5c656d;
+    --red:#e0241b; --gold:#e8c34a; --good:#cfd6d4; --fail:#d6453a;
+    --ok:#7fb47f;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{background:var(--bg); color:var(--ink);
+    font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;}
+  .wrap{max-width:860px; margin:0 auto; padding:14px 12px 28px;}
+  .cap{font-size:10px; letter-spacing:.22em; text-transform:uppercase; color:var(--mut); font-weight:700;}
+
+  /* ---- mode tabs ---- */
+  .tabs{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;}
+  .tab{flex:1 1 auto; min-width:86px; padding:9px 6px; text-align:center; cursor:pointer;
+    background:var(--panel); border:1px solid var(--line); border-radius:6px;
+    font-size:11px; letter-spacing:.18em; text-transform:uppercase; font-weight:700; color:var(--mut);
+    user-select:none; transition:color .15s, border-color .15s;}
+  .tab:hover{color:var(--ink);}
+  .tab.on{color:var(--ink); border-color:#4a5560; background:var(--panel2);
+    box-shadow:inset 0 -2px 0 var(--red);}
+  select,button{font:inherit;}
+  .row{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+  .specialrow{margin:-2px 0 10px; display:none;}
+  .specialrow.show{display:flex;}
+  select{background:var(--panel); color:var(--ink); border:1px solid var(--line);
+    border-radius:6px; padding:7px 10px; font-size:12px;}
+  select:focus,button:focus,input:focus{outline:2px solid var(--gold); outline-offset:1px;}
+
+  /* ---- stage ---- */
+  .stage{position:relative; border:1px solid var(--line); border-radius:10px; overflow:hidden;
+    background:
+      radial-gradient(120% 90% at 50% 38%, #11151a 0%, #0a0c0f 62%, #060708 100%);
+    cursor:crosshair; touch-action:manipulation;}
+  .stage canvas{display:block; width:100%; height:100%;}
+  .stage.shake{animation:shake .3s;}
+  @keyframes shake{0%,100%{transform:translate(0,0)}20%{transform:translate(-5px,2px)}40%{transform:translate(4px,-3px)}60%{transform:translate(-3px,2px)}80%{transform:translate(2px,-1px)}}
+  @media (prefers-reduced-motion: reduce){ .stage.shake{animation:none;} }
+
+  #flash{position:absolute; left:0; right:0; top:13%; text-align:center; pointer-events:none;
+    opacity:0; transition:opacity .12s;}
+  #flash.show{opacity:1;}
+  #flashMain{font-size:30px; font-weight:800; letter-spacing:.3em; text-transform:uppercase; padding-left:.3em;}
+  #flashSub{margin-top:5px; font-size:12px; letter-spacing:.14em; color:var(--mut); font-variant-numeric:tabular-nums;}
+  #hint{position:absolute; left:0; right:0; bottom:10px; text-align:center; font-size:10px;
+    letter-spacing:.2em; text-transform:uppercase; color:var(--dim); pointer-events:none;}
+  #perkTags{position:absolute; top:10px; left:12px; display:flex; gap:6px; flex-wrap:wrap; pointer-events:none;}
+  .ptag{font-size:9px; letter-spacing:.16em; text-transform:uppercase; font-weight:700;
+    color:var(--gold); border:1px solid #4a4022; background:rgba(232,195,74,.07);
+    padding:3px 7px; border-radius:4px;}
+  #stormTag{position:absolute; top:10px; right:12px; font-size:10px; letter-spacing:.18em;
+    text-transform:uppercase; color:var(--fail); font-weight:800; display:none; pointer-events:none;}
+
+  /* ---- program button + HUD + results ---- */
+  .btn.program{border-color:#4a5a3a; background:linear-gradient(180deg,#1c2417,#141a10); color:#cfe0b8;}
+  .btn.program:hover{background:linear-gradient(180deg,#232d1d,#181f12);}
+  .btn.program.running{border-color:#6e2420; background:linear-gradient(180deg,#3a1512,#27100e); color:#f3d9d7;}
+
+  #progHud{position:absolute; top:0; left:0; right:0; padding:10px 14px 11px;
+    background:linear-gradient(180deg,rgba(10,14,18,.92),rgba(10,14,18,.55) 70%,rgba(10,14,18,0));
+    display:none; pointer-events:none; z-index:2;}
+  #progHud.show{display:block;}
+  .ph-top{display:flex; justify-content:space-between; align-items:baseline;}
+  #phSeg{font-size:12px; letter-spacing:.16em; text-transform:uppercase; font-weight:800; color:#cfe0b8;}
+  #phClock{font-size:14px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--ink); letter-spacing:.04em;}
+  .ph-trains{margin-top:2px; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--mut);}
+  .ph-bar{margin-top:7px; height:4px; background:rgba(255,255,255,.08); border-radius:3px; overflow:hidden;}
+  .ph-fill{height:100%; width:0%; background:linear-gradient(90deg,#7fae5a,#cfe0b8); transition:width .25s linear;}
+
+  .progResults{display:none; margin-top:12px; background:var(--panel); border:1px solid var(--line); border-radius:9px; overflow:hidden;}
+  .progResults.show{display:block;}
+  .pr-h{padding:12px 15px 10px; border-bottom:1px solid var(--line); background:linear-gradient(180deg,#1a2213,#141a10);
+    display:flex; justify-content:space-between; align-items:baseline;}
+  .pr-h .t{font-size:13px; font-weight:800; letter-spacing:.05em; color:#cfe0b8;}
+  .pr-h .o{font-size:11px; color:var(--mut); font-variant-numeric:tabular-nums;}
+  .pr-table{width:100%; border-collapse:collapse;}
+  .pr-table th{font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); font-weight:700;
+    text-align:right; padding:8px 12px 6px; border-bottom:1px solid var(--line);}
+  .pr-table th:first-child{text-align:left;}
+  .pr-table td{font-size:12px; padding:7px 12px; border-bottom:1px solid #1a1f25; text-align:right;
+    font-variant-numeric:tabular-nums; color:#c4ccca;}
+  .pr-table td:first-child{text-align:left; color:var(--ink); font-weight:700;}
+  .pr-table tr:last-child td{border-bottom:none;}
+  .pr-table .rate{color:var(--gold); font-weight:700;}
+  .pr-foot{padding:10px 15px 12px; font-size:11px; line-height:1.5; color:var(--dim); border-top:1px solid var(--line);}
+  .pr-foot b{color:var(--mut);}
+
+  /* ---- progress bar ---- */
+  .progwrap{margin-top:10px; display:none;}
+  .progwrap.show{display:block;}
+  .proghead{display:flex; justify-content:space-between; margin-bottom:5px;}
+  .proghead .val{font-size:11px; color:var(--ink); font-variant-numeric:tabular-nums; letter-spacing:.08em;}
+  .pbar{height:8px; background:#0e1115; border:1px solid var(--line); border-radius:5px; overflow:hidden;}
+  .pfill{height:100%; width:0%; background:linear-gradient(90deg,#9aa6a0,#e8ecea); transition:width .2s linear;}
+  .pfill.blocked{background:var(--fail);}
+
+  /* ---- stats ---- */
+  .stats{display:grid; grid-template-columns:repeat(6,1fr); gap:6px; margin-top:12px;}
+  @media (max-width:560px){ .stats{grid-template-columns:repeat(3,1fr);} }
+  .stat{background:var(--panel); border:1px solid var(--line); border-radius:7px; padding:9px 8px 8px; text-align:center;}
+  .stat .v{font-size:19px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1.1;}
+  .stat .v.gold{color:var(--gold);} .stat .v.red{color:var(--fail);}
+  .stat .k{margin-top:3px; font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:var(--mut); font-weight:700;}
+
+  /* ---- timing tape ---- */
+  .tape{margin-top:10px; background:var(--panel); border:1px solid var(--line); border-radius:7px; padding:10px 12px 8px;}
+  .tapehead{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;}
+  #tapeRead{font-size:11px; color:var(--ink); font-variant-numeric:tabular-nums; letter-spacing:.06em;}
+  .tape canvas{display:block; width:100%; height:46px;}
+
+  /* ---- controls ---- */
+  .ctrls{margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+  .btn{padding:10px 18px; border-radius:6px; border:1px solid var(--line); background:var(--panel2);
+    color:var(--ink); font-size:12px; letter-spacing:.2em; text-transform:uppercase; font-weight:800; cursor:pointer;}
+  .btn.primary{border-color:#6e2420; background:linear-gradient(180deg,#3a1512,#27100e); color:#f3d9d7;}
+  .btn.primary:hover{background:linear-gradient(180deg,#481a16,#2c1210);}
+  .btn:hover{border-color:#4a5560;}
+  .chips{display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;}
+  .chip{cursor:pointer; user-select:none; padding:7px 10px; border-radius:6px; border:1px solid var(--line);
+    background:var(--panel); font-size:10px; letter-spacing:.14em; text-transform:uppercase; font-weight:700; color:var(--mut);}
+  .chip.on{color:var(--gold); border-color:#5a4d22; background:rgba(232,195,74,.06);}
+  .chip .tok{color:var(--ink); margin-left:5px; letter-spacing:.05em;}
+  .chip.disabled{opacity:.35; pointer-events:none;}
+  .sliders{display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:8px 16px; margin-top:12px;
+    background:var(--panel); border:1px solid var(--line); border-radius:7px; padding:10px 12px;}
+  .sl{display:flex; flex-direction:column; gap:4px;}
+  .sl .lab{display:flex; justify-content:space-between; font-size:9px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--mut); font-weight:700;}
+  .sl .lab b{color:var(--ink); font-variant-numeric:tabular-nums; letter-spacing:.04em;}
+  input[type=range]{accent-color:#b8412f; width:100%;}
+  .foot{margin-top:12px; font-size:11px; color:var(--dim); line-height:1.55;}
+  .foot b{color:var(--mut); font-weight:700;}
+
+  /* ---- two-column layout: trainer + guide sidebar ---- */
+  .layout{display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:20px; align-items:start;}
+  @media (max-width:920px){ .layout{grid-template-columns:1fr;} }
+  .main{min-width:0;}
+
+  /* background-noise layer inside the stage */
+  #bgnoise{position:absolute; inset:0; width:100%; height:100%; z-index:0; pointer-events:none; display:none;}
+  .stage canvas#cv{position:relative; z-index:1;}
+
+  /* ---- guide sidebar ---- */
+  .guide{background:var(--panel); border:1px solid var(--line); border-radius:9px;
+    padding:0; overflow:hidden; position:sticky; top:14px;}
+  .guide-h{padding:13px 15px 11px; border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,#171c22,#12161b);}
+  .guide-h .t{font-size:13px; font-weight:800; letter-spacing:.06em; color:var(--ink);}
+  .guide-h .s{margin-top:3px; font-size:10px; letter-spacing:.04em; color:var(--mut);}
+  .guide-body{max-height:72vh; overflow-y:auto; padding:4px 15px 16px;}
+  .guide-body::-webkit-scrollbar{width:8px;}
+  .guide-body::-webkit-scrollbar-thumb{background:#2a323b; border-radius:4px;}
+  .gsec{margin-top:15px;}
+  .gsec h4{font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:var(--gold);
+    font-weight:800; margin-bottom:7px; display:flex; align-items:center; gap:7px;}
+  .gsec h4 .n{display:inline-flex; align-items:center; justify-content:center; width:17px; height:17px;
+    border-radius:50%; background:rgba(232,195,74,.13); border:1px solid #5a4d22;
+    font-size:9px; color:var(--gold); letter-spacing:0;}
+  .gsec p{font-size:12px; line-height:1.55; color:#c4ccca; margin-bottom:7px;}
+  .gsec p b{color:var(--ink); font-weight:700;}
+  .gsec ul{list-style:none; margin:0 0 7px;}
+  .gsec li{font-size:12px; line-height:1.5; color:#c4ccca; padding-left:14px; position:relative; margin-bottom:5px;}
+  .gsec li::before{content:'▸'; position:absolute; left:0; color:var(--red); font-size:10px; top:1px;}
+  .gsec li b{color:var(--ink); font-weight:700;}
+  .gcard{background:#0e1216; border:1px solid var(--line); border-radius:7px; padding:10px 12px; margin:8px 0;}
+  .gcard .gc-t{font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:var(--mut); font-weight:700; margin-bottom:6px;}
+  .gstep{display:flex; gap:9px; font-size:12px; line-height:1.45; color:#c4ccca; margin-bottom:8px;}
+  .gstep:last-child{margin-bottom:0;}
+  .gstep .gd{flex:0 0 auto; width:5px; height:5px; border-radius:50%; background:var(--red); margin-top:6px;}
+  .gstep b{color:var(--ink); font-weight:700;}
+  .gnote{font-size:11px; line-height:1.5; color:var(--dim); border-left:2px solid #2a323b; padding-left:9px; margin-top:7px;}
+  .gtable{width:100%; border-collapse:collapse; margin:6px 0; font-size:11px;}
+  .gtable td{padding:5px 6px; border-bottom:1px solid #1c2127; color:#c4ccca; vertical-align:top;}
+  .gtable td:first-child{color:var(--ink); font-weight:700; white-space:nowrap;}
+  .gtable tr:last-child td{border-bottom:none;}
+  .gref{margin-top:14px; padding-top:11px; border-top:1px solid var(--line); font-size:10px; line-height:1.5; color:var(--dim);}
+  .gref a{color:var(--mut); text-decoration:none; border-bottom:1px dotted #3a434c;}</style>
+</head>
+<body>
+<div class="wrap">
+<div class="layout">
+<div class="main">
+
+  <div class="tabs" id="tabs">
+    <div class="tab on" data-mode="gen">Generator</div>
+    <div class="tab" data-mode="doctor">Doctor</div>
+    <div class="tab" data-mode="special">Special</div>
+  </div>
+
+  <div class="row specialrow" id="specialRow">
+    <span class="cap">Check type</span>
+    <select id="specialSel">
+      <option value="ds">Decisive Strike</option>
+      <option value="oc1">Overcharge I</option>
+      <option value="oc2">Overcharge II</option>
+      <option value="oc3">Overcharge III</option>
+      <option value="opp">Oppression</option>
+      <option value="bnp">Brand New Part</option>
+      <option value="snap">Snap Out of It</option>
+    </select>
+  </div>
+
+  <div class="stage" id="stage">
+    <canvas id="bgnoise"></canvas>
+    <canvas id="cv"></canvas>
+    <div id="perkTags"></div>
+    <div id="stormTag">MERCILESS STORM</div>
+    <div id="progHud">
+      <div class="ph-top">
+        <span id="phSeg">1/5 · WARM-UP</span>
+        <span id="phClock">5:00</span>
+      </div>
+      <div class="ph-trains" id="phTrains">Find your rhythm</div>
+      <div class="ph-bar"><div class="ph-fill" id="phFill"></div></div>
+    </div>
+    <div id="flash"><div id="flashMain"></div><div id="flashSub"></div></div>
+    <div id="hint">SPACE or LEFT CLICK anywhere to hit</div>
+  </div>
+
+  <div class="progwrap" id="progwrap">
+    <div class="proghead"><span class="cap" id="progLabel">Generator</span><span class="val" id="progVal">0.0%</span></div>
+    <div class="pbar"><div class="pfill" id="pfill"></div></div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="v gold" id="sGreat">0</div><div class="k">Greats</div></div>
+    <div class="stat"><div class="v" id="sGood">0</div><div class="k">Goods</div></div>
+    <div class="stat"><div class="v red" id="sMiss">0</div><div class="k">Misses</div></div>
+    <div class="stat"><div class="v" id="sGreatPct">–</div><div class="k">Great rate</div></div>
+    <div class="stat"><div class="v" id="sStreak">0 / 0</div><div class="k">Streak / best</div></div>
+    <div class="stat"><div class="v" id="sWindow">–</div><div class="k">Great window</div></div>
+  </div>
+
+  <div class="tape">
+    <div class="tapehead"><span class="cap">Timing — last 24 presses (0 = great-zone center)</span><span id="tapeRead">no presses yet</span></div>
+    <canvas id="tapeCv"></canvas>
+  </div>
+
+  <div class="ctrls">
+    <button class="btn primary" id="startBtn">Start</button>
+    <button class="btn program" id="progBtn">▶ 5-Min Program</button>
+    <button class="btn" id="resetBtn">Reset stats</button>
+    <span class="cap" style="margin-left:4px">Pacing</span>
+    <select id="pacingSel">
+      <option value="drill">Drill — back to back</option>
+      <option value="realistic">Realistic — game odds</option>
+    </select>
+    <span class="cap" style="margin-left:4px">Input</span>
+    <select id="inputSel">
+      <option value="both">Space + left click</option>
+      <option value="mouse">Left click only</option>
+      <option value="space">Space only</option>
+    </select>
+  </div>
+
+  <div class="progResults" id="progResults"></div>
+
+  <div class="chips" id="chips">
+    <div class="chip" id="cHF">Hyperfocus <span class="tok" id="hfTok"></span></div>
+    <div class="chip" id="cSO">Stake Out <span class="tok" id="soTok"></span></div>
+    <div class="chip" id="cUP">Unnerving <span class="tok" id="upTok">off</span></div>
+    <div class="chip" id="cLB">Lullaby <span class="tok" id="lbTok">0</span></div>
+    <div class="chip" id="cTB">Toolbox</div>
+    <div class="chip" id="cMS">Merciless Storm</div>
+    <div class="chip" id="cBG">BG Noise <span class="tok" id="bgTok">off</span></div>
+  </div>
+
+  <div class="sliders">
+    <div class="sl"><div class="lab"><span>Pointer speed</span><b id="vSpeed">1.00×</b></div>
+      <input type="range" id="rSpeed" min="50" max="150" value="100"></div>
+    <div class="sl"><div class="lab"><span>Zone size</span><b id="vZone">1.00×</b></div>
+      <input type="range" id="rZone" min="40" max="200" value="100"></div>
+    <div class="sl"><div class="lab"><span>Warning lead (approx.)</span><b id="vWarn">500 ms</b></div>
+      <input type="range" id="rWarn" min="0" max="1000" value="500" step="25"></div>
+    <div class="sl"><div class="lab"><span>Volume</span><b id="vVol">60%</b></div>
+      <input type="range" id="rVol" min="0" max="100" value="60"></div>
+  </div>
+
+  <div class="foot" id="footNote"></div>
+
+</div><!-- /.main -->
+
+<aside class="guide">
+  <div class="guide-h">
+    <div class="t">Skill-Check Accuracy Guide</div>
+    <div class="s">How to actually get better — grounded in motor-learning research</div>
+  </div>
+  <div class="guide-body">
+
+    <div class="gsec">
+      <h4><span class="n">i</span>What you're training</h4>
+      <p>A DBD skill check is a textbook <b>coincidence-anticipation timing</b> (CAT) task: you press to coincide with a moving target hitting a fixed zone. This is the same skill lab studies measure with a Bassin timer (the row of LEDs racing toward a mark). The research on CAT and motor learning translates directly to what you do here.</p>
+      <p>The core finding that should shape your practice: <b>the conditions that make practice feel good are usually not the ones that build lasting skill.</b> Easy, repetitive, predictable drilling produces fast in-session gains that evaporate. Harder, varied practice feels worse but sticks.</p>
+    </div>
+
+    <div class="gsec">
+      <h4><span class="n">1</span>Vary everything (contextual interference)</h4>
+      <p>Blocking — same condition over and over — beats varied practice <b>during</b> a session but loses badly on retention and transfer tests. Random/varied practice forces you to reconstruct the timing each rep, which builds a stronger, more flexible motor representation.</p>
+      <ul>
+        <li>Change the <b>pointer-speed slider</b> between sets (0.85× / 1.0× / 1.3×) instead of grinding one speed.</li>
+        <li>Mix <b>zone sizes</b> down so a normal great zone feels huge by comparison.</li>
+        <li>Rotate modes — Generator, then Overcharge, then Doctor — rather than 200 identical gen checks.</li>
+        <li>Turn on <b>BG Noise</b> so the visual field isn't sterile (more on this below).</li>
+      </ul>
+      <p class="gnote">Expect your in-session numbers to drop when you do this. That dip is the point — it's the signature of practice that transfers.</p>
+    </div>
+
+    <div class="gsec">
+      <h4><span class="n">2</span>Short, spaced sessions beat marathons</h4>
+      <p>For the same total reps, <b>distributed practice</b> (spread across sessions with rest) produces better retention than <b>massed practice</b> (one long grind). Consolidation happens in the gaps, including sleep.</p>
+      <ul>
+        <li><b>10–15 min</b> focused blocks, not hour-long sessions.</li>
+        <li>Several short sessions across the week &gt; one big cram.</li>
+        <li>Revisit across multiple days — robustness comes from re-encountering the skill after partial forgetting.</li>
+      </ul>
+    </div>
+
+    <div class="gsec">
+      <h4><span class="n">3</span>Read your bias, then correct it</h4>
+      <p>The <b>timing tape</b> below the dial is your feedback instrument. CAT research separates error into two kinds, and they need different fixes:</p>
+      <table class="gtable">
+        <tr><td>Constant error</td><td>Your average offset — consistently early or late. A <b>systematic bias</b> you can consciously correct.</td></tr>
+        <tr><td>Variable error</td><td>Your spread (±SD) — how inconsistent you are. Reducing this <b>is</b> the skill; it only comes down with reps.</td></tr>
+      </table>
+      <ul>
+        <li>Watch the <b>avg</b> readout. If it reads "−25ms early," you're jumping the gun — deliberately wait a hair longer.</li>
+        <li>Watch the <b>±SD</b>. A tight cluster off-center is an easy fix (shift your timing); a wide scatter means keep drilling.</li>
+        <li>Research on fast targets: people tend to fire <b>early</b> as speed climbs. If you fail Overcharge III early, that's expected — bias later.</li>
+      </ul>
+    </div>
+
+    <div class="gsec">
+      <h4><span class="n">4</span>Anticipate the position, react to the gong</h4>
+      <p>Great checks (~33 ms window on a gen) are too tight for pure reaction — average human visual reaction is ~200–250 ms. You can't see the pointer arrive and then decide. You have to <b>pre-plan the press</b> from where the zone sits and let the gong cue your rhythm.</p>
+      <ul>
+        <li>The instant the zone appears, your eyes should snap to it and your hand should already be "loading."</li>
+        <li>Train with the <b>warning-lead slider low</b> sometimes to wean off the audio crutch; raise it to rehearse rhythm.</li>
+        <li>Keep your eyes on the <b>zone</b>, not chasing the pointer around the dial.</li>
+      </ul>
+    </div>
+
+    <div class="gsec">
+      <h4><span class="n">5</span>Overload, then return to normal</h4>
+      <p>Briefly training <b>harder than real</b> makes the real thing feel slow — a deliberate-practice staple.</p>
+      <div class="gcard">
+        <div class="gc-t">Overload set → calibration set</div>
+        <div class="gstep"><span class="gd"></span><div>Run a set at <b>1.3–1.5× speed</b> with a <b>smaller zone</b>. You'll miss more. Fine.</div></div>
+        <div class="gstep"><span class="gd"></span><div>Drop back to <b>1.0×</b>, normal zone. It feels languid; greats land easier.</div></div>
+        <div class="gstep"><span class="gd"></span><div>Finish at <b>game-realistic</b> settings to re-anchor the true timing before you stop.</div></div>
+      </div>
+    </div>
+
+    <div class="gsec">
+      <h4><span class="n">✦</span>The 5-minute program (one button)</h4>
+      <p>The <b>▶ 5-Min Program</b> button runs this whole structure for you — it auto-switches speed, zone, task type, and pressure through five timed segments, then gives you a per-segment breakdown with your timing bias. It's the fastest way to get the research-backed routine without fiddling with controls.</p>
+      <div class="gcard">
+        <div class="gc-t">What it runs</div>
+        <div class="gstep"><span class="gd"></span><div><b>0:45 Warm-up</b> — Generator, 1.0×. Re-find the rhythm.</div></div>
+        <div class="gstep"><span class="gd"></span><div><b>1:15 Overload</b> — 1.4× speed, 0.7× zone. Harder than real.</div></div>
+        <div class="gstep"><span class="gd"></span><div><b>1:15 Varied</b> — rotates Generator / Overcharge II / Madness every ~7s, BG noise on. Contextual interference.</div></div>
+        <div class="gstep"><span class="gd"></span><div><b>0:45 Bias-fix</b> — Generator 1.0×. Center your timing.</div></div>
+        <div class="gstep"><span class="gd"></span><div><b>1:00 Pressure</b> — continuous Merciless Storm. Under fatigue.</div></div>
+      </div>
+      <p class="gnote">Run it 3–4× a week, not 60 min once. Track great-rate and ±SD <b>across</b> sessions — the breakdown after each run is your scoreboard.</p>
+    </div>
+
+    <div class="gsec">
+      <h4><span class="n">✦</span>Prefer to drive it yourself? (15-min version)</h4>
+      <div class="gcard">
+        <div class="gstep"><span class="gd"></span><div><b>2 min warm-up</b> — Generator, Drill pacing, 1.0×. Just re-find the rhythm; ignore the score.</div></div>
+        <div class="gstep"><span class="gd"></span><div><b>3 min overload</b> — 1.35× speed, zone 0.7×. Push into the discomfort zone.</div></div>
+        <div class="gstep"><span class="gd"></span><div><b>4 min varied</b> — alternate Generator / Overcharge II / Doctor every ~10 checks, 1.0×, <b>BG Noise on</b>.</div></div>
+        <div class="gstep"><span class="gd"></span><div><b>3 min bias-fix</b> — back to Generator. Read the tape's avg; consciously correct early/late until the cluster centers on 0.</div></div>
+        <div class="gstep"><span class="gd"></span><div><b>3 min pressure</b> — toggle <b>Merciless Storm</b> and survive full gens. Continuous checks under fatigue = match-realistic stress.</div></div>
+      </div>
+    </div>
+
+    <div class="gsec">
+      <h4><span class="n">!</span>One honest limit</h4>
+      <p>Lab CAT studies note training often transfers to the trained task but <b>not perfectly to a different environment</b>. This trainer sharpens the read, the rhythm, and your timing-bias awareness — but browser input latency isn't your in-game pipeline. Use it to build the skill, then <b>calibrate exact timing in a DBD custom match</b>.</p>
+    </div>
+
+    <div class="gref">
+      Principles drawn from motor-learning research on coincidence-anticipation timing, the contextual-interference effect (random vs. blocked practice), and distributed vs. massed practice (Shea &amp; Morgan; Schmidt; CAT/Bassin-timer studies). General findings, applied to this task — not DBD-specific studies.
+    </div>
+
+  </div>
+</aside>
+
+</div><!-- /.layout -->
+</div><!-- /.wrap -->
+
+<script>
+'use strict';
+/* =====================================================================
+   Game constants — deadbydaylight.wiki.gg "Skill Checks" statistics table.
+   Zone lengths are % of the dial circumference (1% = 3.6°).
+   rot = seconds per full pointer rotation. minPos/maxPos = earliest /
+   latest clock position (degrees from 12 o'clock) where the success
+   zone may begin (earliest 4 o'clock = 120°, latest 11 o'clock = 330°;
+   Decisive Strike earliest is 8 o'clock = 240°).
+===================================================================== */
+const TYPES = {
+  gen:  {label:'Generator',        great:3,  good:13, rot:1.1, bonus:1,  fail:10, minPos:120, trig:8,    bpGreat:300},
+  ds:   {label:'Decisive Strike',  great:7,  good:0,  rot:1.1, bonus:0,  fail:0,  minPos:240, trig:100,  bpGreat:300},
+  oc1:  {label:'Overcharge I',     great:7,  good:0,  rot:1.2, bonus:0,  fail:13, minPos:120, trig:100,  bpGreat:300},
+  oc2:  {label:'Overcharge II',    great:6,  good:0,  rot:1.1, bonus:0,  fail:14, minPos:120, trig:100,  bpGreat:300},
+  oc3:  {label:'Overcharge III',   great:5,  good:0,  rot:1.0, bonus:0,  fail:15, minPos:120, trig:100,  bpGreat:300},
+  opp:  {label:'Oppression',       great:5,  good:0,  rot:1.0, bonus:0,  fail:10, minPos:120, trig:100,  bpGreat:300},
+  bnp:  {label:'Brand New Part',   great:7,  good:0,  rot:1.1, bonus:0,  fail:10, minPos:120, trig:100,  bpGreat:300},
+  snap: {label:'Snap Out of It',   great:12, good:0,  rot:1.2, bonus:0,  fail:25, minPos:120, trig:80,   bpGreat:300}
+};
+const MAX_POS = 330;            // latest success-zone start: 11 o'clock
+const GEN_CHARGES = 90;         // generator charges; 1 charge/s solo
+const FAIL_PAUSE_MS = 3000;     // interaction pause after a failed check
+// Approximations (not published exactly): warning-gong lead time and
+// Lullaby per-token scaling (linear here).
+
+/* ---------------- 5-minute training program ----------------
+   Structure follows the motor-learning principles in the sidebar:
+   warm-up → OVERLOAD (harder than real) → VARIED (contextual interference:
+   rotate task type/speed/position) → BIAS-FIX (read the timing tape, center it)
+   → PRESSURE (continuous storm under fatigue). Total = 300s. Each segment sets
+   speed/zone/warning/mode automatically; per-segment stats feed an end summary. */
+const PROGRAM = [
+  {name:'Warm-up',  trains:'Find your rhythm',              dur:45, kind:'gen',    speed:1.00, zone:1.00, warn:500, bg:false},
+  {name:'Overload', trains:'Faster + smaller than real',    dur:75, kind:'gen',    speed:1.40, zone:0.70, warn:350, bg:false},
+  {name:'Varied',   trains:'Contextual interference',       dur:75, kind:'rotate', speed:1.00, zone:1.00, warn:500, bg:true },
+  {name:'Bias-fix', trains:'Center your timing tape',       dur:45, kind:'gen',    speed:1.00, zone:1.00, warn:500, bg:false},
+  {name:'Pressure', trains:'Continuous under fatigue',      dur:60, kind:'storm',  speed:1.00, zone:1.00, warn:120, bg:false}
+];
+const PROG_TOTAL = PROGRAM.reduce((a,s)=>a+s.dur,0);   // 300s
+// Varied segment cycles these every ~7s for high contextual interference:
+const VARIED_ROT = [
+  {mode:'gen',     special:null,  speed:1.00, label:'Generator'},
+  {mode:'special', special:'oc2', speed:1.05, label:'Overcharge II'},
+  {mode:'doctor',  special:null,  speed:1.00, label:'Madness'}
+];
+const VARIED_SWITCH_MS = 7000;
+
+/* ---------------- state ---------------- */
+const S = {
+  mode:'gen', special:'ds', pacing:'drill', running:false,
+  phase:'idle',                 // idle | between | warn | active | cooldown
+  nextAt:0, warnAt:0, check:null, flashUntil:0,
+  hf:false, hfTok:0, so:false, soTok:4, soNextAt:0, up:0, lullaby:0, toolbox:false,
+  storm:false, bgNoise:false,   // storm = continuous-check overlay; bgNoise = animated background
+  speedMul:1, zoneMul:1, warnLead:500, vol:0.6, input:'both',
+  charges:0, stormCount:0,
+  stats:{great:0, good:0, miss:0, streak:0, best:0, errs:[]},
+  lastSecRoll:0,
+  prog:{active:false, segIdx:-1, segStart:0, snap:null, segStats:[], rotIdx:0, rotAt:0}
+};
+function activeType(){
+  if (S.mode==='special') return TYPES[S.special];
+  return TYPES.gen;             // gen + doctor both run on the generator dial
+}
+// Storm only makes sense on the repair-style dials (Generator / Doctor), not Specials.
+const stormOn = () => S.storm && (S.mode==='gen'||S.mode==='doctor');
+const perksApply = () => (S.mode==='gen'||S.mode==='doctor');
+const isRepair = () => (S.mode==='gen'||S.mode==='doctor');
+
+/* ---------------- DOM ---------------- */
+const $ = id => document.getElementById(id);
+const stage=$('stage'), cv=$('cv'), ctx=cv.getContext('2d');
+const tapeCv=$('tapeCv'), tctx=tapeCv.getContext('2d');
+const bgCv=$('bgnoise'), bgx=bgCv.getContext('2d');
+let W=0,H=0,DPR=1;
+function sizeCanvas(){
+  DPR = Math.min(window.devicePixelRatio||1, 2);
+  W = stage.clientWidth;
+  H = Math.max(300, Math.min(Math.round(W*0.56), 420));
+  stage.style.height = H+'px';
+  cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0);
+  bgCv.width=W*DPR; bgCv.height=H*DPR; bgx.setTransform(DPR,0,0,DPR,0,0);
+  tapeCv.width=tapeCv.clientWidth*DPR; tapeCv.height=46*DPR; tctx.setTransform(DPR,0,0,DPR,0,0);
+  initBgNoise(); drawTape();
+}
+window.addEventListener('resize', sizeCanvas);
+
+/* ---------------- audio (synthesized stand-ins, not game audio) ----------------
+   DBD's cue is a metallic "gong" before the check and a sharp bright "ding" on a
+   great. These can't legally bundle the game's copyrighted assets, so they're
+   synthesized to mimic the *character*: inharmonic struck-metal partials with a
+   fast attack and ringing decay for the gong/ding, a discordant low stinger +
+   filtered noise burst for the failure. */
+let AC=null;
+function ac(){ if(!AC){ AC = new (window.AudioContext||window.webkitAudioContext)(); }
+  if(AC.state==='suspended') AC.resume(); return AC; }
+
+// One struck-metal partial: sine at f, exponential decay (fast attack = "strike").
+function metalPartial(f, t0, dur, amp, type='sine'){
+  const a=ac(), o=a.createOscillator(), g=a.createGain();
+  o.type=type; o.frequency.setValueAtTime(f,t0);
+  g.gain.setValueAtTime(0.0001,t0);
+  g.gain.exponentialRampToValueAtTime(amp*S.vol+0.0001, t0+0.004);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+  o.connect(g).connect(a.destination); o.start(t0); o.stop(t0+dur+0.05);
+}
+function tone(f,t0,dur,type,g0){ metalPartial(f,t0,dur,g0,type); }
+
+// Warning gong: low-ish metallic bell. Inharmonic partial ratios (not a clean
+// harmonic series) give the struck-metal, slightly ominous quality.
+function sndWarn(){ if(S.vol<=0||S.lullaby>=5) return; const t=ac().currentTime;
+  metalPartial(523.3, t, 0.62, 0.17);             // strike fundamental
+  metalPartial(523.3*2.76, t, 0.42, 0.085);       // inharmonic overtone
+  metalPartial(523.3*5.40, t, 0.26, 0.045);       // bright shimmer
+  metalPartial(261.7, t, 0.70, 0.06, 'triangle'); // body / weight
+}
+// Great hit: short, bright, satisfying metallic "ding" up high.
+function sndGreat(){ if(S.vol<=0)return; const t=ac().currentTime;
+  metalPartial(1567.98, t, 0.22, 0.20);           // bright fundamental (G6)
+  metalPartial(1567.98*2.0, t+0.005, 0.15, 0.10);
+  metalPartial(1567.98*2.93, t+0.01, 0.10, 0.05); // inharmonic sparkle
+}
+// Good hit: duller, lower confirmation — no sparkle, quick decay.
+function sndGood(){ if(S.vol<=0)return; const t=ac().currentTime;
+  metalPartial(659.3, t, 0.13, 0.10);
+  metalPartial(880.0, t+0.004, 0.09, 0.05);
+}
+// Failure: gen-explosion stinger — discordant low cluster + filtered noise burst.
+function sndFail(){ if(S.vol<=0)return; const a=ac(), t=a.currentTime;
+  metalPartial(146.8, t, 0.55, 0.16, 'sawtooth'); // low discordant body
+  metalPartial(155.6, t, 0.50, 0.12, 'sawtooth'); // beats against it = harsh
+  metalPartial(98.0,  t, 0.60, 0.13, 'triangle');
+  const len=Math.floor(a.sampleRate*0.40), buf=a.createBuffer(1,len,a.sampleRate), d=buf.getChannelData(0);
+  for(let i=0;i<len;i++){ const env=Math.pow(1-i/len,1.7); d[i]=(Math.random()*2-1)*env; }
+  const src=a.createBufferSource(); src.buffer=buf;
+  const f=a.createBiquadFilter(); f.type='lowpass';
+  f.frequency.setValueAtTime(1600,t); f.frequency.exponentialRampToValueAtTime(280,t+0.35); // "whump"
+  const g=a.createGain(); g.gain.setValueAtTime(0.26*S.vol,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.4);
+  src.connect(f).connect(g).connect(a.destination); src.start(t); src.stop(t+0.42);
+}
+
+/* ---------------- check spawning ---------------- */
+function rotMs(type){
+  const hf = (S.hf && perksApply()) ? 1 + 0.04*S.hfTok : 1;   // +4% pointer speed / token
+  return type.rot*1000 / (hf * S.speedMul);
+}
+function zoneDegs(type){
+  let great = type.great*3.6*S.zoneMul;
+  let good  = type.good *3.6*S.zoneMul;
+  if (S.up>0 && perksApply()){                                 // Unnerving shrinks GOOD zone only
+    good *= 1 - [0,0.4,0.5,0.6][S.up];
+  }
+  return {great, good};
+}
+function spawnCheck(now){
+  const type = activeType();
+  const z = zoneDegs(type);
+  const total = z.great + z.good;
+  const maxStart = Math.min(MAX_POS, 360 - total - 4);
+  const minStart = Math.min(type.minPos, maxStart);
+  const zoneStart = minStart + Math.random()*(maxStart-minStart);
+  let dir=1, cx=W/2, cy=H/2;
+  if (S.mode==='doctor'){                                      // Madness: off-centre / reversed / both
+    const r=Math.floor(Math.random()*3);
+    if(r===0||r===2){ const m=dialR()+34;
+      cx=m+Math.random()*Math.max(0,W-2*m); cy=m+Math.random()*Math.max(0,H-2*m); }
+    if(r===1||r===2) dir=-1;
+  }
+  S.check = {t0:now, type, dir, cx, cy, zoneStart, great:z.great, good:z.good,
+             degPerMs: 360/rotMs(type), resolved:false};
+  S.phase='active';
+}
+function queueNext(now, delay){ S.phase='between'; S.nextAt = now + delay; }
+function beginWarn(now){
+  S.phase='warn';
+  // Merciless Storm chains checks back-to-back; a long warning lead would slow the
+  // cadence well below the ~0.9s/check the wiki's "~11 checks solo" benchmark implies.
+  const base = stormOn() ? 120 : S.warnLead;
+  const lead = base * (1 - Math.min(S.lullaby,5)/5);           // Lullaby: shorter lead, silent at 5
+  S.warnAt = now + lead;
+  sndWarn();
+}
+
+/* ---------------- resolution ---------------- */
+function classify(travel){
+  const c=S.check, s=c.zoneStart;
+  if (travel < s) return 'early';
+  if (travel < s + c.great) return 'great';
+  if (travel < s + c.great + c.good) return 'good';
+  return 'late';
+}
+function errMs(travel){           // signed ms from great-zone center
+  const c=S.check, center=c.zoneStart + c.great/2;
+  return (travel-center)/c.degPerMs;
+}
+function resolve(kind, travel, now){
+  const c=S.check; c.resolved=true;
+  let res=kind;
+  // Stake Out: a Good is consumed into a Great (+1% bonus) and feeds Hyperfocus
+  let soUsed=false;
+  if (kind==='good' && S.so && S.soTok>0 && perksApply()){ S.soTok--; soUsed=true; res='great'; }
+  const t=c.type;
+  if (res==='great'){
+    S.stats.great++; S.stats.streak++; S.stats.best=Math.max(S.stats.best,S.stats.streak);
+    // HF bonus uses tokens held *before* this great (first check of an action gets no bonus)
+    const tokBefore = (S.hf && perksApply()) ? S.hfTok : 0;
+    if (S.hf && perksApply()) S.hfTok=Math.min(6,S.hfTok+1);
+    const mul = 1 + 0.30*tokBefore;
+    const bonus = soUsed ? 1 : t.bonus;
+    addProgress(bonus*mul);
+    flash('GREAT', 'var(--gold)', travel, now, bonus? '+'+(bonus*mul).toFixed(1)+'%':'');
+    sndGreat();
+  } else if (res==='good'){
+    S.stats.good++; S.stats.streak=0; S.hfTok=0;
+    flash('GOOD', 'var(--good)', travel, now, '');
+    sndGood();
+  } else {
+    S.stats.miss++; S.stats.streak=0; S.hfTok=0;
+    addProgress(-t.fail);
+    const tag = kind==='early'?'early':kind==='late'?'late':'no press';
+    flash('FAILED', 'var(--fail)', travel, now, (t.fail? '−'+t.fail+'%  ·  ':'')+tag);
+    sndFail();
+    stage.classList.remove('shake'); void stage.offsetWidth; stage.classList.add('shake');
+  }
+  if (travel!=null && kind!=='nopress'){
+    S.stats.errs.push({ms:errMs(travel), res});
+    if(S.stats.errs.length>200) S.stats.errs.shift();
+  }
+  S.flashUntil = now+650;
+  // what happens next
+  if (stormOn()){
+    // Unlimited-timing storm: chain continuously regardless of result. A miss costs
+    // progress (already applied above) but never blocks or ends the session, so you
+    // can drill the continuous cadence as long as you like.
+    if (res==='great'||res==='good') S.stormCount++;
+    queueNext(now, 250);
+  } else if (kind==='early'||kind==='late'||kind==='nopress'){
+    const pause = (S.pacing==='realistic') ? FAIL_PAUSE_MS : 900;
+    S.phase='cooldown'; S.nextAt=now+pause;
+  } else {
+    if (S.pacing==='drill') queueNext(now, 500+Math.random()*900);
+    else { S.phase='between'; S.nextAt=now; S.lastSecRoll=now; }
+  }
+  updateStats();
+}
+function flash(main, color, travel, now, sub){
+  $('flashMain').textContent=main; $('flashMain').style.color=color;
+  let s=sub||'';
+  if (travel!=null){
+    const e=errMs(travel);
+    s += (s?'  ·  ':'') + (e<0? Math.abs(e).toFixed(0)+' ms early' : '+'+e.toFixed(0)+' ms late');
+  }
+  $('flashSub').textContent=s;
+  $('flash').classList.add('show');
+}
+
+/* ---------------- progress (generator charge) ---------------- */
+function totalCharges(){ return GEN_CHARGES; }
+function addProgress(pct){
+  if (!isRepair() || !pct) return;
+  S.charges = Math.max(0, Math.min(totalCharges(), S.charges + pct/100*totalCharges()));
+}
+function drawProgress(){
+  const w=$('progwrap');
+  const show=isRepair();
+  w.classList.toggle('show', show);
+  if(!show) return;
+  const pct=S.charges/totalCharges()*100;
+  $('progLabel').textContent = stormOn() ? 'Generator — Merciless Storm' : 'Generator';
+  $('progVal').textContent=pct.toFixed(1)+'%';
+  $('pfill').style.width=pct+'%';
+}
+
+/* ---------------- main loop ---------------- */
+let raf=null, lastBg=0;
+function loop(){
+  const now=performance.now();
+  const bgdt=lastBg? Math.min(0.05,(now-lastBg)/1000):0; lastBg=now;
+  drawBgNoise(bgdt);
+  step(now); draw(now);
+  raf=requestAnimationFrame(loop);
+}
+let lastT=0;
+function step(now){
+  const dt=lastT? (now-lastT)/1000 : 0; lastT=now;
+
+  // ---- 5-minute program scheduler ----
+  if (S.prog.active){
+    const p=S.prog, seg=PROGRAM[p.segIdx];
+    if (seg){
+      if ((now-p.segStart)/1000 >= seg.dur){ advanceSegment(now); }
+      else if (seg.kind==='rotate' && now-p.rotAt>=VARIED_SWITCH_MS && S.phase!=='active'){
+        applyVariedRot(p.rotIdx+1, now);          // cycle task type for contextual interference
+      }
+    }
+    updateProgHud(now);
+  }
+
+  if (S.running){
+    // passive charge gain while repairing (1 charge/s solo)
+    if (isRepair() && S.phase!=='cooldown'){
+      S.charges=Math.min(totalCharges(), S.charges+dt);
+      if (stormOn() && S.charges>=totalCharges()){
+        if (S.prog.active){ S.charges=GEN_CHARGES*0.9; }   // during the program, keep checks coming
+        else {
+          S.running=false; S.phase='idle';
+          flash('GEN COMPLETED','var(--gold)',null,now,'storm cleared — '+S.stormCount+' checks hit'); S.flashUntil=now+2200; setStartBtn();
+        }
+      }
+    }
+    // Stake Out token regen: +1 / 15 s, max 4
+    if (S.so && now>=S.soNextAt){ S.soTok=Math.min(4,S.soTok+1); S.soNextAt=now+15000; }
+
+    if (S.phase==='between'){
+      if (S.pacing==='drill' || stormOn() || S.mode==='special'){
+        if (now>=S.nextAt) beginWarn(now);
+      } else {                                   // realistic: roll once per second
+        if (now-S.lastSecRoll>=1000){
+          S.lastSecRoll=now;
+          const t=activeType();
+          let odds=t.trig;
+          if (isRepair() && S.toolbox) odds=40;
+          if (S.hf) odds+=4*S.hfTok;
+          if (S.up>0) odds+=10;
+          if (Math.random()*100<odds) beginWarn(now);
+        }
+      }
+    } else if (S.phase==='warn'){
+      if (now>=S.warnAt) spawnCheck(now);
+    } else if (S.phase==='active'){
+      const c=S.check, travel=(now-c.t0)*c.degPerMs;
+      if (travel>=c.zoneStart+c.great+c.good) resolve('nopress',null,now);
+    } else if (S.phase==='cooldown'){
+      if (now>=S.nextAt){
+        if (S.pacing==='drill'||S.mode==='special'||S.prog.active) queueNext(now,300);
+        else {S.phase='between'; S.lastSecRoll=now;}
+      }
+    }
+  }
+  if (S.flashUntil && now>S.flashUntil){ $('flash').classList.remove('show'); S.flashUntil=0; }
+  drawProgress();
+  if (!S._chipAt || now>=S._chipAt){ refreshChips(); S._chipAt=now+250; }   // throttle innerHTML writes
+}
+
+/* ---------------- input ---------------- */
+function press(now){
+  if(!S.running) return;
+  ac();
+  if (S.phase==='active' && !S.check.resolved){
+    const travel=(now-S.check.t0)*S.check.degPerMs;
+    const k=classify(travel);
+    resolve(k, travel, now);
+  } // pressing with no check up does nothing (game behaviour)
+}
+window.addEventListener('keydown', e=>{
+  if (e.code==='Space' && S.input!=='mouse'){ e.preventDefault(); if(!e.repeat) press(performance.now()); }
+});
+// Left click (or tap) anywhere counts as a press — matches an M1 skill-check bind,
+// so your cursor doesn't have to sit on the stage. Controls are excluded so the UI
+// still works mid-session; while not running, the page behaves normally.
+document.addEventListener('pointerdown', e=>{
+  if (S.input==='space' || e.button!==0 || !S.running) return;
+  if (e.target.closest('button,select,input,a,.chip,.tab')) return;
+  e.preventDefault(); press(performance.now());
+});
+
+/* ---------------- animated background noise ----------------
+   Optional visual clutter to practice reading checks against a moving field —
+   drifting dust motes, a few brighter "embers", and slow large blobs that sweep
+   across (mimicking the moving environment / camera motion behind a real gen).
+   Drawn on a separate canvas *behind* the dial so it never alters check geometry. */
+let bgParts=[], bgBlobs=[];
+function initBgNoise(){
+  bgParts=[]; bgBlobs=[];
+  const n=Math.round(W*H/9000);                 // density scales with area
+  for(let i=0;i<n;i++){
+    bgParts.push({
+      x:Math.random()*W, y:Math.random()*H,
+      r:0.6+Math.random()*1.8,
+      vx:(Math.random()-0.5)*14, vy:(Math.random()-0.5)*14,
+      a:0.06+Math.random()*0.22,
+      ember:Math.random()<0.12                   // a few warm bright ones
+    });
+  }
+  for(let i=0;i<3;i++){
+    bgBlobs.push({
+      x:Math.random()*W, y:Math.random()*H,
+      r:70+Math.random()*120,
+      vx:(Math.random()-0.5)*22, vy:(Math.random()-0.5)*16,
+      a:0.05+Math.random()*0.05
+    });
+  }
+}
+function drawBgNoise(dt){
+  bgx.clearRect(0,0,W,H);
+  if(!S.bgNoise){ bgCv.style.display='none'; return; }
+  bgCv.style.display='block';
+  // slow sweeping blobs (soft radial gradients)
+  for(const b of bgBlobs){
+    b.x+=b.vx*dt; b.y+=b.vy*dt;
+    if(b.x<-b.r) b.x=W+b.r; if(b.x>W+b.r) b.x=-b.r;
+    if(b.y<-b.r) b.y=H+b.r; if(b.y>H+b.r) b.y=-b.r;
+    const g=bgx.createRadialGradient(b.x,b.y,0,b.x,b.y,b.r);
+    g.addColorStop(0,`rgba(120,140,150,${b.a})`);
+    g.addColorStop(1,'rgba(120,140,150,0)');
+    bgx.fillStyle=g; bgx.beginPath(); bgx.arc(b.x,b.y,b.r,0,Math.PI*2); bgx.fill();
+  }
+  // drifting motes
+  for(const p of bgParts){
+    p.x+=p.vx*dt; p.y+=p.vy*dt;
+    if(p.x<0)p.x+=W; if(p.x>W)p.x-=W; if(p.y<0)p.y+=H; if(p.y>H)p.y-=H;
+    if(p.ember){
+      bgx.fillStyle=`rgba(216,120,70,${p.a})`;
+      bgx.shadowColor='rgba(216,120,70,0.5)'; bgx.shadowBlur=4;
+    } else {
+      bgx.fillStyle=`rgba(200,210,210,${p.a})`; bgx.shadowBlur=0;
+    }
+    bgx.beginPath(); bgx.arc(p.x,p.y,p.r,0,Math.PI*2); bgx.fill();
+  }
+  bgx.shadowBlur=0;
+}
+
+/* ---------------- drawing ---------------- */
+function dialR(){ return Math.max(70, Math.min(112, Math.min(W,H)*0.24)); }
+function posXY(cx,cy,thetaDeg,r){
+  const a=thetaDeg*Math.PI/180; return [cx+r*Math.sin(a), cy-r*Math.cos(a)];
+}
+function arcBand(cx,cy,thA,thB,rIn,rOut,dir,fill,stroke){
+  // travel degrees -> screen theta (CW positive); dir=-1 mirrors
+  const a=(dir*thA-90)*Math.PI/180, b=(dir*thB-90)*Math.PI/180;
+  ctx.beginPath();
+  ctx.arc(cx,cy,rOut,a,b,dir<0);
+  ctx.arc(cx,cy,rIn,b,a,dir>0);
+  ctx.closePath();
+  if(fill){ ctx.fillStyle=fill; ctx.fill(); }
+  if(stroke){ ctx.strokeStyle=stroke; ctx.lineWidth=2; ctx.stroke(); }
+}
+function draw(now){
+  ctx.clearRect(0,0,W,H);
+  const c=S.check, on=(S.phase==='active');
+  const cx=on?c.cx:W/2, cy=on?c.cy:H/2, R=dialR();
+  ctx.save();
+  ctx.globalAlpha = S.running ? 1 : 0.32;
+
+  // --- dial face: faint inner disc + the white ring (DBD look) ---
+  const grad=ctx.createRadialGradient(cx,cy,R*0.2,cx,cy,R*1.06);
+  grad.addColorStop(0,'rgba(180,190,188,0.05)');
+  grad.addColorStop(1,'rgba(180,190,188,0)');
+  ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(cx,cy,R*1.06,0,Math.PI*2); ctx.fill();
+
+  // outer thin guide ring (the track the pointer rides)
+  ctx.strokeStyle='rgba(238,242,240,0.85)'; ctx.lineWidth=2.5;
+  ctx.shadowColor='rgba(240,244,242,.30)'; ctx.shadowBlur=6;
+  ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke();
+  ctx.shadowBlur=0;
+
+  if (on){
+    const gs=c.zoneStart, ge=gs+c.great, de=ge+c.good;
+    const rIn=R-9, rOut=R+9;
+    // good zone: lighter translucent fill + white outline (the wider span)
+    if (c.good>0){
+      arcBand(cx,cy,ge,de,rIn,rOut,c.dir,'rgba(240,244,242,0.16)',null);
+      arcBand(cx,cy,ge,de,rIn,rOut,c.dir,null,'rgba(240,244,242,0.95)');
+    }
+    // great zone: solid bright white band at the leading edge, with a soft glow
+    ctx.shadowColor='rgba(255,255,255,.55)'; ctx.shadowBlur=8;
+    arcBand(cx,cy,gs,ge,rIn,rOut,c.dir,'#fbfdfc',null);
+    ctx.shadowBlur=0;
+
+    // pointer: clean red needle from hub to just past the ring
+    const travel=(now-c.t0)*c.degPerMs;
+    const th=c.dir*travel;
+    const [x1,y1]=posXY(cx,cy,th,8), [x2,y2]=posXY(cx,cy,th,R+14);
+    ctx.shadowColor='rgba(224,36,27,.65)'; ctx.shadowBlur=7;
+    ctx.strokeStyle='#e8261c'; ctx.lineWidth=4; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    ctx.shadowBlur=0;
+    // red hub
+    ctx.fillStyle='#e8261c'; ctx.beginPath(); ctx.arc(cx,cy,4.5,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,180,176,0.9)'; ctx.beginPath(); ctx.arc(cx,cy,1.8,0,Math.PI*2); ctx.fill();
+  } else {
+    ctx.fillStyle='rgba(232,236,234,.45)'; ctx.beginPath(); ctx.arc(cx,cy,3.5,0,Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+/* ---------------- timing tape ---------------- */
+function tapeDomain(){
+  const t=activeType(), z=zoneDegs(t), dpm=360/rotMs(t);
+  const halfGreat=z.great/2/dpm, goodMs=z.good/dpm;
+  return {halfGreat, goodMs, min:-130, max:Math.max(220, halfGreat+goodMs+60)};
+}
+function drawTape(){
+  const w=tapeCv.clientWidth, h=46;
+  tctx.clearRect(0,0,w,h);
+  const D=tapeDomain();
+  const X=ms=> (ms-D.min)/(D.max-D.min)*w;
+  // fail field
+  tctx.fillStyle='rgba(214,69,58,.10)'; tctx.fillRect(0,8,w,24);
+  // good band (after great)
+  tctx.fillStyle='rgba(207,214,212,.16)';
+  tctx.fillRect(X(D.halfGreat),8, X(D.halfGreat+D.goodMs)-X(D.halfGreat),24);
+  // great band
+  tctx.fillStyle='rgba(232,195,74,.30)';
+  tctx.fillRect(X(-D.halfGreat),8, X(D.halfGreat)-X(-D.halfGreat),24);
+  // zero line
+  tctx.strokeStyle='rgba(232,195,74,.9)'; tctx.lineWidth=1;
+  tctx.beginPath(); tctx.moveTo(X(0),4); tctx.lineTo(X(0),36); tctx.stroke();
+  // axis labels
+  tctx.fillStyle='#5c656d'; tctx.font='9px ui-sans-serif,system-ui';
+  tctx.textAlign='left'; tctx.fillText('early', 2, 44);
+  tctx.textAlign='right'; tctx.fillText('late', w-2, 44);
+  tctx.textAlign='center'; tctx.fillText('0', X(0), 44);
+  // ticks
+  const errs=S.stats.errs.slice(-24);
+  for(const e of errs){
+    const x=Math.max(2,Math.min(w-2,X(e.ms)));
+    tctx.strokeStyle = e.res==='great' ? '#e8c34a' : e.res==='good' ? '#cfd6d4' : '#d6453a';
+    tctx.lineWidth=2;
+    tctx.beginPath(); tctx.moveTo(x,10); tctx.lineTo(x,30); tctx.stroke();
+  }
+  // readout
+  const last20=S.stats.errs.slice(-20).map(e=>e.ms);
+  if(last20.length){
+    const mean=last20.reduce((a,b)=>a+b,0)/last20.length;
+    const sd=Math.sqrt(last20.reduce((a,b)=>a+(b-mean)*(b-mean),0)/last20.length);
+    const lastE=S.stats.errs[S.stats.errs.length-1].ms;
+    $('tapeRead').textContent =
+      'last '+(lastE<0?Math.abs(lastE).toFixed(0)+'ms early':'+'+lastE.toFixed(0)+'ms')+
+      '  ·  avg '+(mean<0?'−':'+')+Math.abs(mean).toFixed(0)+'ms ±'+sd.toFixed(0);
+  } else $('tapeRead').textContent='no presses yet';
+}
+
+/* ---------------- stats / chips ---------------- */
+function updateStats(){
+  const st=S.stats, tot=st.great+st.good+st.miss;
+  $('sGreat').textContent=st.great; $('sGood').textContent=st.good; $('sMiss').textContent=st.miss;
+  $('sGreatPct').textContent= tot? Math.round(st.great/tot*100)+'%':'–';
+  $('sStreak').textContent= st.streak+' / '+st.best;
+  drawTape();
+}
+function refreshChips(){
+  const t=activeType(), dpm=360/rotMs(t), z=zoneDegs(t);
+  $('sWindow').textContent=(z.great/dpm).toFixed(0)+' ms';
+  $('hfTok').textContent=S.hf? '●'.repeat(S.hfTok)+'○'.repeat(6-S.hfTok) : 'off';
+  $('soTok').textContent=S.so? '●'.repeat(S.soTok)+'○'.repeat(4-S.soTok) : 'off';
+  $('upTok').textContent=['off','I −40%','II −50%','III −60%'][S.up];
+  $('lbTok').textContent=S.lullaby + (S.lullaby>=5?' (silent)':'');
+  $('bgTok').textContent=S.bgNoise?'on':'off';
+  const apply=perksApply();
+  $('cHF').classList.toggle('disabled',!apply); $('cSO').classList.toggle('disabled',!apply);
+  $('cUP').classList.toggle('disabled',!apply);
+  $('cTB').classList.toggle('disabled',!(isRepair()&&S.pacing==='realistic'));
+  $('cLB').classList.toggle('disabled',!apply);
+  $('cMS').classList.toggle('disabled',!isRepair());   // Merciless Storm only on repair dials
+  $('cMS').classList.toggle('on',stormOn());
+  // stage perk tags
+  const tags=[];
+  if(apply&&S.hf)tags.push('Hyperfocus '+S.hfTok);
+  if(apply&&S.so)tags.push('Stake Out '+S.soTok);
+  if(apply&&S.up)tags.push('Unnerving '+['','I','II','III'][S.up]);
+  if(apply&&S.lullaby>0)tags.push('Lullaby '+S.lullaby);
+  $('perkTags').innerHTML=tags.map(x=>'<span class="ptag">'+x+'</span>').join('');
+  $('stormTag').style.display=stormOn()?'block':'none';
+}
+
+/* ---------------- session control ---------------- */
+function setStartBtn(){ $('startBtn').textContent = S.running? 'Stop':'Start'; }
+function startStop(){
+  ac();
+  if (S.prog.active){ cancelProgram(); return; }   // Stop also cancels a running program
+  if (S.running){ S.running=false; S.phase='idle'; setStartBtn(); return; }
+  S.running=true; S.hfTok=0; S.soTok=4; S.soNextAt=performance.now()+15000;
+  $('pfill').classList.remove('blocked');
+  // Merciless Storm begins at 90% gen progress (its real trigger point); otherwise from 0.
+  if (stormOn()){ S.charges=GEN_CHARGES*0.9; S.stormCount=0; }
+  else S.charges=0;
+  const now=performance.now();
+  S.lastSecRoll=now;
+  queueNext(now, 700);
+  setStartBtn();
+}
+$('startBtn').addEventListener('click', e=>{e.stopPropagation(); startStop();});
+$('resetBtn').addEventListener('click', e=>{e.stopPropagation();
+  if(S.prog.active) return;     // don't wipe stats mid-program
+  S.stats={great:0,good:0,miss:0,streak:0,best:0,errs:[]}; updateStats();});
+
+/* ---------------- 5-minute program control ---------------- */
+function applySegment(seg, now){
+  // base settings common to every segment
+  S.speedMul=seg.speed; S.zoneMul=seg.zone; S.warnLead=seg.warn; S.bgNoise=seg.bg;
+  S.up=0; S.hf=false; S.so=false; S.lullaby=0; S.toolbox=false; S.hfTok=0;   // perks off during program
+  // mode / storm per segment kind
+  if (seg.kind==='storm'){ S.mode='gen'; S.storm=true; }
+  else if (seg.kind==='rotate'){ S.storm=false; applyVariedRot(0, now); }
+  else { S.mode='gen'; S.storm=false; }
+  // sync the mode tabs visually
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on', x.dataset.mode===S.mode));
+  $('specialRow').classList.toggle('show', S.mode==='special');
+  // reflect sliders
+  $('rSpeed').value=Math.round(seg.speed*100); $('vSpeed').textContent=seg.speed.toFixed(2)+'×';
+  $('rZone').value=Math.round(seg.zone*100);   $('vZone').textContent=seg.zone.toFixed(2)+'×';
+  $('rWarn').value=seg.warn;                   $('vWarn').textContent=seg.warn+' ms';
+  $('bgTok').textContent=S.bgNoise?'on':'off'; $('cBG').classList.toggle('on',S.bgNoise);
+  // fresh dial for the segment
+  S.charges = stormOn()? GEN_CHARGES*0.9 : 0;
+  S.phase='idle'; S.check=null;
+  queueNext(now, 600);
+}
+function applyVariedRot(idx, now){
+  const r=VARIED_ROT[idx % VARIED_ROT.length];
+  S.prog.rotIdx=idx; S.prog.rotAt=now;
+  S.mode=r.mode; if(r.special) S.special=r.special;
+  S.speedMul=r.speed;
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on', x.dataset.mode===S.mode));
+  $('specialRow').classList.toggle('show', S.mode==='special');
+  if(S.mode==='special'){ $('specialSel').value=S.special; }
+  S.phase='idle'; S.check=null; queueNext(now, 350);
+}
+function snapStats(){ return {g:S.stats.great, gd:S.stats.good, m:S.stats.miss, e:S.stats.errs.length}; }
+function finalizeSegment(){
+  const p=S.prog; if(p.segIdx<0||!p.snap) return;
+  const s=p.snap;
+  const errs=S.stats.errs.slice(s.e).map(x=>x.ms);
+  const greats=S.stats.great-s.g, goods=S.stats.good-s.gd, misses=S.stats.miss-s.m;
+  const hits=greats+goods+misses;
+  let mean=null, sd=null;
+  if(errs.length){ mean=errs.reduce((a,b)=>a+b,0)/errs.length;
+    sd=Math.sqrt(errs.reduce((a,b)=>a+(b-mean)*(b-mean),0)/errs.length); }
+  p.segStats.push({name:PROGRAM[p.segIdx].name, greats, goods, misses, hits, mean, sd});
+}
+function advanceSegment(now){
+  const p=S.prog;
+  finalizeSegment();
+  p.segIdx++;
+  if (p.segIdx>=PROGRAM.length){ endProgram(now); return; }
+  const seg=PROGRAM[p.segIdx];
+  p.segStart=now; p.snap=snapStats();
+  applySegment(seg, now);
+  updateProgHud(now);
+  refreshChips(); drawProgress();
+}
+function startProgram(){
+  ac();
+  // clean slate
+  S.running=true;
+  S.stats={great:0,good:0,miss:0,streak:0,best:0,errs:[]};
+  S.prog={active:true, segIdx:-1, segStart:performance.now(), snap:null, segStats:[], rotIdx:0, rotAt:0};
+  $('progResults').classList.remove('show'); $('progResults').innerHTML='';
+  $('progHud').classList.add('show');
+  $('flash').classList.remove('show');
+  // lock manual controls that would fight the program
+  setProgLock(true);
+  advanceSegment(performance.now());
+  updateStats(); setStartBtn(); setProgBtn();
+}
+function endProgram(now){
+  // NOTE: advanceSegment() already finalized the segment we're leaving before it
+  // detected we're past the end — do NOT finalize again here (would index out of range).
+  S.prog.active=false; S.running=false; S.phase='idle'; S.check=null;
+  $('progHud').classList.remove('show');
+  S.storm=false; S.bgNoise=false; $('cBG').classList.remove('on'); $('bgTok').textContent='off';
+  flash('PROGRAM COMPLETE','var(--ok)',null,now,'see your breakdown below'); S.flashUntil=now+2600;
+  setProgLock(false); setStartBtn(); setProgBtn();
+  renderResults();
+  refreshChips(); drawProgress();
+  $('progResults').scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+function cancelProgram(){
+  const now=performance.now();
+  S.prog.active=false; S.running=false; S.phase='idle'; S.check=null;
+  $('progHud').classList.remove('show');
+  S.storm=false; $('cMS').classList.remove('on');
+  flash('PROGRAM STOPPED','var(--mut)',null,now,''); S.flashUntil=now+1400;
+  setProgLock(false); setStartBtn(); setProgBtn();
+  refreshChips(); drawProgress();
+}
+function setProgBtn(){
+  const b=$('progBtn');
+  b.textContent = S.prog.active ? '■ Stop Program' : '▶ 5-Min Program';
+  b.classList.toggle('running', S.prog.active);
+}
+function setProgLock(on){
+  // dim + disable controls the program drives, so the user can't desync it
+  ['pacingSel','specialSel'].forEach(id=>$(id).disabled=on);
+  document.querySelectorAll('.tab').forEach(t=>{ t.style.pointerEvents=on?'none':''; t.style.opacity=on?0.5:''; });
+  document.querySelectorAll('.chip').forEach(c=>{ c.style.pointerEvents=on?'none':''; c.style.opacity=on?0.4:''; });
+  ['rSpeed','rZone','rWarn'].forEach(id=>$(id).disabled=on);
+  $('startBtn').style.opacity=on?0.5:''; $('startBtn').style.pointerEvents=on?'none':'';
+  $('resetBtn').style.opacity=on?0.5:''; $('resetBtn').style.pointerEvents=on?'none':'';
+}
+function fmtClock(s){ s=Math.max(0,Math.ceil(s)); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+function updateProgHud(now){
+  const p=S.prog; if(!p.active||p.segIdx<0) return;
+  const seg=PROGRAM[p.segIdx];
+  const segEl=(now-p.segStart)/1000;
+  const segRemain=seg.dur-segEl;
+  // overall time left = remaining in this seg + all later segs
+  let later=0; for(let i=p.segIdx+1;i<PROGRAM.length;i++) later+=PROGRAM[i].dur;
+  const totalRemain=Math.max(0, later+segRemain);
+  let segName=(p.segIdx+1)+'/'+PROGRAM.length+' · '+seg.name.toUpperCase();
+  let trains=seg.trains;
+  if(seg.kind==='rotate'){ const r=VARIED_ROT[p.rotIdx%VARIED_ROT.length]; trains='Contextual interference · '+r.label; }
+  $('phSeg').textContent=segName;
+  $('phTrains').textContent=trains;
+  $('phClock').textContent=fmtClock(totalRemain);
+  $('phFill').style.width=Math.max(0,Math.min(100,segEl/seg.dur*100))+'%';
+}
+function renderResults(){
+  const p=S.prog;
+  const tot=S.stats.great+S.stats.good+S.stats.miss;
+  const overallRate=tot?Math.round(S.stats.great/tot*100):0;
+  const allErr=S.stats.errs.map(x=>x.ms);
+  let oMean=null,oSd=null;
+  if(allErr.length){ oMean=allErr.reduce((a,b)=>a+b,0)/allErr.length;
+    oSd=Math.sqrt(allErr.reduce((a,b)=>a+(b-oMean)*(b-oMean),0)/allErr.length); }
+  const biasTxt = oMean==null?'–':(oMean<0?Math.abs(oMean).toFixed(0)+'ms early':'+'+oMean.toFixed(0)+'ms late');
+  let rows='';
+  for(const s of p.segStats){
+    const rate=s.hits?Math.round(s.greats/s.hits*100):0;
+    const b = s.mean==null?'–':(s.mean<0?'−'+Math.abs(s.mean).toFixed(0):'+'+s.mean.toFixed(0));
+    const sd = s.sd==null?'–':'±'+s.sd.toFixed(0);
+    rows+=`<tr><td>${s.name}</td><td>${s.hits}</td><td class="rate">${rate}%</td><td>${s.greats}/${s.goods}/${s.misses}</td><td>${b} ${sd}</td></tr>`;
+  }
+  // pick the weakest segment by great-rate (ignoring zero-hit) to coach next time
+  let weak=null;
+  for(const s of p.segStats){ if(!s.hits) continue; const r=s.greats/s.hits; if(weak==null||r<weak.r) weak={name:s.name,r}; }
+  const coach = weak ? `Weakest block: <b>${weak.name}</b> (${Math.round(weak.r*100)}% great). ` : '';
+  const biasCoach = (oMean!=null && Math.abs(oMean)>12)
+    ? `Your overall bias is <b>${biasTxt}</b> — consciously press ${oMean<0?'a hair later':'a touch earlier'} next run to center it.`
+    : (oMean!=null ? `Your timing is well-centered (avg ${biasTxt}). Now work on tightening the spread (±${oSd!=null?oSd.toFixed(0):'–'}ms).` : '');
+  $('progResults').innerHTML =
+    `<div class="pr-h"><span class="t">Program complete — 5-minute breakdown</span><span class="o">overall ${overallRate}% great · avg ${biasTxt} ±${oSd!=null?oSd.toFixed(0):'–'}ms</span></div>`+
+    `<table class="pr-table"><thead><tr><th>Segment</th><th>Checks</th><th>Great</th><th>G/Gd/M</th><th>Bias ±SD</th></tr></thead><tbody>${rows}</tbody></table>`+
+    `<div class="pr-foot">${coach}${biasCoach} <b>Bias</b> = avg signed timing error (− early / + late); <b>±SD</b> = consistency. Run this 3–4×/week and watch great-rate climb and ±SD shrink across sessions, not within one.</div>`;
+  $('progResults').classList.add('show');
+}
+$('progBtn').addEventListener('click', e=>{ e.stopPropagation();
+  if(S.prog.active) cancelProgram(); else startProgram();
+});
+
+/* ---------------- UI wiring ---------------- */
+document.querySelectorAll('.tab').forEach(el=>el.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+  el.classList.add('on');
+  S.mode=el.dataset.mode; S.running=false; S.phase='idle'; S.check=null; S.charges=0; setStartBtn();
+  $('specialRow').classList.toggle('show', S.mode==='special');
+  $('pacingSel').disabled = !isRepair();
+  drawTape(); refreshChips(); drawProgress();
+}));
+$('specialSel').addEventListener('change',e=>{S.special=e.target.value; drawTape(); refreshChips();});
+$('pacingSel').addEventListener('change',e=>{S.pacing=e.target.value; refreshChips();});
+$('inputSel').addEventListener('change',e=>{
+  S.input=e.target.value;
+  $('hint').textContent = {both:'SPACE or LEFT CLICK anywhere to hit',
+                           mouse:'LEFT CLICK anywhere to hit',
+                           space:'SPACE to hit'}[S.input];
+});
+$('cHF').addEventListener('click',()=>{S.hf=!S.hf; S.hfTok=0; $('cHF').classList.toggle('on',S.hf);});
+$('cSO').addEventListener('click',()=>{S.so=!S.so; S.soTok=4; $('cSO').classList.toggle('on',S.so);});
+$('cUP').addEventListener('click',()=>{S.up=(S.up+1)%4; $('cUP').classList.toggle('on',S.up>0); drawTape();});
+$('cLB').addEventListener('click',()=>{S.lullaby=(S.lullaby+1)%6; $('cLB').classList.toggle('on',S.lullaby>0);});
+$('cTB').addEventListener('click',()=>{S.toolbox=!S.toolbox; $('cTB').classList.toggle('on',S.toolbox);});
+$('cMS').addEventListener('click',()=>{
+  if(!isRepair()) return;                       // disabled on Special; ignore
+  S.storm=!S.storm; $('cMS').classList.toggle('on',stormOn());
+  // restarting cleanly avoids a half-charged gen carrying weird state into a storm
+  S.running=false; S.phase='idle'; S.check=null; S.charges=0; setStartBtn();
+  drawProgress(); refreshChips();
+});
+$('cBG').addEventListener('click',()=>{S.bgNoise=!S.bgNoise; $('cBG').classList.toggle('on',S.bgNoise); $('bgTok').textContent=S.bgNoise?'on':'off';});
+function slider(id,vid,fmt,set){ $(id).addEventListener('input',e=>{const v=+e.target.value; set(v); $(vid).textContent=fmt(v); drawTape(); refreshChips();}); }
+slider('rSpeed','vSpeed',v=>(v/100).toFixed(2)+'×',v=>S.speedMul=v/100);
+slider('rZone','vZone',v=>(v/100).toFixed(2)+'×',v=>S.zoneMul=v/100);
+slider('rWarn','vWarn',v=>v+' ms',v=>S.warnLead=v);
+slider('rVol','vVol',v=>v+'%',v=>S.vol=v/100);
+
+$('footNote').innerHTML =
+  '<b>Verified vs. game data:</b> zone sizes, pointer rotation times, zone spawn positions (4\u201311 o\u2019clock; DS 8\u201311), the +1% gen great bonus, fail penalties, per-second trigger odds, 3s fail pause, Hyperfocus (+4% speed &amp; odds, +30% bonus per token), Unnerving (good zone only, \u221240/50/60%), Stake Out, Madness off-centre/reversed rolls, Merciless Storm continuous chaining. ' +
+  '<b>Approximated / adapted:</b> warning-gong lead time (slider), Lullaby per-token scaling, all sounds (synthesized, not the game\u2019s copyrighted audio), background-noise visuals. Storm here runs <b>unlimited</b> \u2014 a miss costs progress but never blocks. Browser input latency differs from your in-game pipeline \u2014 train the read and rhythm here, calibrate exact timing in customs.';
+
+/* ---------------- boot ---------------- */
+sizeCanvas(); updateStats(); refreshChips(); drawProgress();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

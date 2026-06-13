@@ -1,0 +1,56 @@
+# CI for the DBD Skill-Check Trainer (spec §11 step 9).
+# Lives at the repo root; the app is in dbd-skillcheck-trainer/.
+# The deploy job publishes dist/ to GitHub Pages on pushes to main —
+# enable Pages (Settings → Pages → Source: GitHub Actions) for it to take effect.
+
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+defaults:
+  run:
+    working-directory: dbd-skillcheck-trainer
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: dbd-skillcheck-trainer/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Test
+        run: npm test
+      - name: Build
+        run: npx vite build
+      - name: Upload dist artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dbd-skillcheck-trainer/dist
+
+  deploy:
+    # Static deploy to GitHub Pages; only from the default branch.
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
