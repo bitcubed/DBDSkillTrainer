@@ -171,41 +171,44 @@ export function drawDial(
     ctx.shadowBlur = 0;
     edgeTick(ctx, cx, cy, gs, c.dir, rIn - 2, rOut + 2);
 
-    // Pointer: red needle from hub to just past the ring, with a short fading trail.
+    // Pointer: the DBD-style white needle — a slim tapered triangle sweeping from
+    // the hub to just past the ring — with a short fading trail behind it.
     const travel = (now - c.t0) * c.degPerMs;
     const th = c.dir * travel;
-    for (let i = state.reducedMotion ? 0 : 3; i >= 1; i--) {
-      const ghost = th - c.dir * 3.2 * i;
-      const [gx1, gy1] = posXY(cx, cy, ghost, 8);
-      const [gx2, gy2] = posXY(cx, cy, ghost, R + 14);
-      ctx.strokeStyle = `rgba(232,38,28,${0.16 / i})`;
-      ctx.lineWidth = 4;
-      ctx.lineCap = 'round';
+    const TIP_R = R + 13;
+    const HALF_DEG = 2.0; // angular half-width of the needle base
+
+    const needle = (angle: number, alpha: number, glow: boolean): void => {
+      const [tx, ty] = posXY(cx, cy, angle, TIP_R);
+      const [blx, bly] = posXY(cx, cy, angle - c.dir * HALF_DEG, 9);
+      const [brx, bry] = posXY(cx, cy, angle + c.dir * HALF_DEG, 9);
+      if (glow) {
+        ctx.shadowColor = `rgba(255,255,255,${0.5 * alpha})`;
+        ctx.shadowBlur = 7;
+      }
+      ctx.fillStyle = `rgba(245,248,247,${alpha})`;
       ctx.beginPath();
-      ctx.moveTo(gx1, gy1);
-      ctx.lineTo(gx2, gy2);
-      ctx.stroke();
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(blx, bly);
+      ctx.lineTo(brx, bry);
+      ctx.closePath();
+      ctx.fill();
+      if (glow) ctx.shadowBlur = 0;
+    };
+
+    for (let i = state.reducedMotion ? 0 : 3; i >= 1; i--) {
+      needle(th - c.dir * 3.4 * i, 0.12 / i, false);
     }
-    const [x1, y1] = posXY(cx, cy, th, 8);
-    const [x2, y2] = posXY(cx, cy, th, R + 14);
-    ctx.shadowColor = 'rgba(224,36,27,.65)';
-    ctx.shadowBlur = 7;
-    ctx.strokeStyle = '#e8261c';
-    ctx.lineWidth = 4;
-    ctx.lineCap = 'round';
+    needle(th, 0.98, true);
+
+    // White hub with a faint core, matching the monochrome game dial.
+    ctx.fillStyle = 'rgba(245,248,247,0.95)';
     ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-    // Red hub.
-    ctx.fillStyle = '#e8261c';
-    ctx.beginPath();
-    ctx.arc(cx, cy, 4.5, 0, Math.PI * 2);
+    ctx.arc(cx, cy, 4.2, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = 'rgba(255,180,176,0.9)';
+    ctx.fillStyle = 'rgba(120,130,128,0.9)';
     ctx.beginPath();
-    ctx.arc(cx, cy, 1.8, 0, Math.PI * 2);
+    ctx.arc(cx, cy, 1.6, 0, Math.PI * 2);
     ctx.fill();
   } else {
     ctx.fillStyle = 'rgba(232,236,234,.45)';
