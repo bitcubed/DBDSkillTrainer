@@ -14,6 +14,7 @@ export const DEFAULT_SETTINGS: Settings = {
   speedMul: 1,
   zoneMul: 1,
   warnLeadMs: 500,
+  dialScale: 1,
   bgNoise: false,
   lastMode: 'gen',
   lastSpecial: 'ds',
@@ -57,6 +58,8 @@ export function loadSettings(storage: StorageLike): Settings {
     speedMul: num(o.speedMul, 0.5, 1.5, d.speedMul),
     zoneMul: num(o.zoneMul, 0.4, 2, d.zoneMul),
     warnLeadMs: num(o.warnLeadMs, 0, 1000, d.warnLeadMs),
+    // Dial-size slider range from index.html: 0.5–1.3×.
+    dialScale: num(o.dialScale, 0.5, 1.3, d.dialScale),
     bgNoise: bool(o.bgNoise, d.bgNoise),
     lastMode: oneOf(o.lastMode, MODES, d.lastMode),
     lastSpecial: oneOf(o.lastSpecial, SPECIALS, d.lastSpecial),

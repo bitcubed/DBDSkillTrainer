@@ -14,6 +14,7 @@ export interface SpawnOpts {
   madness: boolean; // mode === 'doctor'
   w: number; // stage size, for the off-centre clamp
   h: number;
+  dialScale?: number; // cosmetic dial size, so the off-centre clamp keeps the (scaled) dial on-canvas
   rng: () => number; // [0, 1)
 }
 
@@ -34,7 +35,7 @@ export function spawnCheck(now: number, type: CheckType, o: SpawnOpts): SkillChe
     if (r === 0 || r === 2) {
       // Off-centre must keep the dial on-canvas: margin = dial radius + 34px,
       // with Math.max(0, …) guarding small viewports against negative ranges.
-      const m = dialRadius(o.w, o.h) + 34;
+      const m = dialRadius(o.w, o.h, o.dialScale ?? 1) + 34;
       cx = m + o.rng() * Math.max(0, o.w - 2 * m);
       cy = m + o.rng() * Math.max(0, o.h - 2 * m);
     }

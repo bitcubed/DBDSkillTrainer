@@ -80,6 +80,8 @@ export interface DialState {
   /** Suppress the needle trail + result pulse (prefers-reduced-motion). */
   reducedMotion?: boolean;
   palette?: ResultPalette;
+  /** Cosmetic dial-size multiplier (the dial-size slider). Default 1. */
+  dialScale?: number;
 }
 
 export function drawDial(
@@ -94,7 +96,8 @@ export function drawDial(
   const on = state.active && c !== null;
   const cx = on ? c.cx : w / 2;
   const cy = on ? c.cy : h / 2;
-  const R = dialRadius(w, h);
+  const scale = state.dialScale ?? 1;
+  const R = dialRadius(w, h, scale);
 
   const pal = state.palette ?? DEFAULT_PALETTE;
 
@@ -155,33 +158,34 @@ export function drawDial(
     const gs = c.zoneStartDeg;
     const ge = gs + c.greatDeg;
     const de = ge + c.goodDeg;
-    const rIn = R - 9;
-    const rOut = R + 9;
+    const rIn = R - 9 * scale;
+    const rOut = R + 9 * scale;
 
     // Good zone: light translucent fill + white outline, bracketed by edge ticks.
     if (c.goodDeg > 0) {
       arcBand(ctx, cx, cy, ge, de, rIn, rOut, c.dir, 'rgba(240,244,242,0.16)', null);
       arcBand(ctx, cx, cy, ge, de, rIn, rOut, c.dir, null, 'rgba(240,244,242,0.95)');
-      edgeTick(ctx, cx, cy, de, c.dir, rIn - 2, rOut + 2);
+      edgeTick(ctx, cx, cy, de, c.dir, rIn - 2 * scale, rOut + 2 * scale);
     }
     // Great zone: solid bright white band at the leading edge with a soft glow.
     ctx.shadowColor = 'rgba(255,255,255,.55)';
     ctx.shadowBlur = 8;
     arcBand(ctx, cx, cy, gs, ge, rIn, rOut, c.dir, '#fbfdfc', null);
     ctx.shadowBlur = 0;
-    edgeTick(ctx, cx, cy, gs, c.dir, rIn - 2, rOut + 2);
+    edgeTick(ctx, cx, cy, gs, c.dir, rIn - 2 * scale, rOut + 2 * scale);
 
     // Pointer: the DBD-style white needle — a slim tapered triangle sweeping from
     // the hub to just past the ring — with a short fading trail behind it.
     const travel = (now - c.t0) * c.degPerMs;
     const th = c.dir * travel;
-    const TIP_R = R + 13;
+    const TIP_R = R + 13 * scale;
     const HALF_DEG = 2.0; // angular half-width of the needle base
+    const BASE_R = 9 * scale;
 
     const needle = (angle: number, alpha: number, glow: boolean): void => {
       const [tx, ty] = posXY(cx, cy, angle, TIP_R);
-      const [blx, bly] = posXY(cx, cy, angle - c.dir * HALF_DEG, 9);
-      const [brx, bry] = posXY(cx, cy, angle + c.dir * HALF_DEG, 9);
+      const [blx, bly] = posXY(cx, cy, angle - c.dir * HALF_DEG, BASE_R);
+      const [brx, bry] = posXY(cx, cy, angle + c.dir * HALF_DEG, BASE_R);
       if (glow) {
         ctx.shadowColor = `rgba(255,255,255,${0.5 * alpha})`;
         ctx.shadowBlur = 7;
@@ -204,16 +208,16 @@ export function drawDial(
     // White hub with a faint core, matching the monochrome game dial.
     ctx.fillStyle = 'rgba(245,248,247,0.95)';
     ctx.beginPath();
-    ctx.arc(cx, cy, 4.2, 0, Math.PI * 2);
+    ctx.arc(cx, cy, 4.2 * scale, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = 'rgba(120,130,128,0.9)';
     ctx.beginPath();
-    ctx.arc(cx, cy, 1.6, 0, Math.PI * 2);
+    ctx.arc(cx, cy, 1.6 * scale, 0, Math.PI * 2);
     ctx.fill();
   } else {
     ctx.fillStyle = 'rgba(232,236,234,.45)';
     ctx.beginPath();
-    ctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
+    ctx.arc(cx, cy, 3.5 * scale, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();

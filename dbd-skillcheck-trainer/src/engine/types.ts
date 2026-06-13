@@ -87,6 +87,7 @@ export interface Settings {
   speedMul: number;
   zoneMul: number;
   warnLeadMs: number;
+  dialScale: number; // cosmetic dial-size multiplier
   bgNoise: boolean;
   lastMode: Mode;
   lastSpecial: SpecialId;

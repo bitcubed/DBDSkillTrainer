@@ -85,8 +85,9 @@ const els: ControlEls = {
     zone: $('rZone') as HTMLInputElement,
     warn: $('rWarn') as HTMLInputElement,
     vol: $('rVol') as HTMLInputElement,
+    dial: $('rDial') as HTMLInputElement,
   },
-  sliderVals: { speed: $('vSpeed'), zone: $('vZone'), warn: $('vWarn'), vol: $('vVol') },
+  sliderVals: { speed: $('vSpeed'), zone: $('vZone'), warn: $('vWarn'), vol: $('vVol'), dial: $('vDial') },
   perkTags: $('perkTags'),
   stormTag: $('stormTag'),
   hint: $('hint'),
@@ -398,6 +399,7 @@ function frame(now: number): void {
     pulse: ui.pulse,
     reducedMotion: reducedMotionOn(),
     palette: pal,
+    dialScale: session.dialScale,
   });
 }
 function loop(): void {
@@ -656,6 +658,13 @@ slider(els.sliders.vol, els.sliderVals.vol, (v) => `${v}%`, (v) => {
   settings.volume = synth.volume;
   persistSettings();
 });
+// Dial size is purely cosmetic (render scale) — not Program-locked, safe to
+// adjust any time, and never touches timing or zone geometry.
+slider(els.sliders.dial, els.sliderVals.dial, (v) => `${(v / 100).toFixed(2)}×`, (v) => {
+  session.dialScale = v / 100;
+  settings.dialScale = session.dialScale;
+  persistSettings();
+});
 
 // ---------------- boot ----------------
 function applySettingsToUi(): void {
@@ -671,6 +680,9 @@ function applySettingsToUi(): void {
   session.zoneMul = settings.zoneMul;
   session.warnLeadMs = settings.warnLeadMs;
   reflectSliders(els, settings.speedMul, settings.zoneMul, settings.warnLeadMs);
+  session.dialScale = settings.dialScale;
+  els.sliders.dial.value = String(Math.round(settings.dialScale * 100));
+  els.sliderVals.dial.textContent = `${settings.dialScale.toFixed(2)}×`;
   bgNoise.enabled = settings.bgNoise;
   els.chips.bg.classList.toggle('on', settings.bgNoise);
   els.toks.bg.textContent = settings.bgNoise ? 'on' : 'off';

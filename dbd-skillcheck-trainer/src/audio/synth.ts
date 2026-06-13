@@ -1,15 +1,32 @@
 // Synthesized audio stand-ins — NOT game audio (copyright; see context doc §5).
-// DBD's cue is a deep, resonant metallic bell-toll before the check and a sharp
-// bright "ding" on a great, both ringing out in a cavernous space. These
-// synthesize the *character*: inharmonic struck-metal partials with a fast
-// attack and long ringing decay, fed into a generated convolution reverb for
-// the echoey tail. The exact game audio is copyrighted and unpublished, so this
-// is an original recreation of the sound's feel — never the file itself.
+// These recreate the *character* of DBD's skill-check cues from a sound-design
+// brief, layer by layer — never the copyrighted files themselves:
+//   warn  ("Shh-ting")    damped dissonant metallic chime + airy noise whoosh,
+//                         through a short metallic room reverb.
+//   good  ("Thud/Clack")  dull muted 300–800 Hz mechanical click, bone dry.
+//   great ("Tchick")      the same click + a bright 1–3 kHz metallic ping.
+//   fail  ("KA-BANG-psh") 60–100 Hz distorted impact + mid-range metal clatter
+//                         + a long broadband hiss tail.
+// All oscillators/noise are generated at runtime; no samples ship in the repo.
 
 import { lullabySilent } from '../engine/perks';
 
 interface WindowWithWebkitAC extends Window {
   webkitAudioContext?: typeof AudioContext;
+}
+
+interface NoiseOpts {
+  t0: number;
+  dur: number;
+  amp: number;
+  /** Bake-in amplitude envelope: linear rise over `attack` of the duration, then exp decay. */
+  attack?: number; // 0..1 fraction of dur (default ~0.02 = near-instant)
+  decay?: number; // decay-curve power (higher = snappier)
+  filter?: BiquadFilterType;
+  f0: number;
+  f1?: number; // if set, sweep cutoff f0→f1 across the burst
+  q?: number;
+  wet?: number; // 0..1 reverb send
 }
 
 export class Synth {
@@ -19,7 +36,6 @@ export class Synth {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private reverb: ConvolverNode | null = null;
-  private reverbSend: GainNode | null = null;
 
   /** Create/resume the context — must be called from a user gesture at least once. */
   ensure(): AudioContext | null {
@@ -35,21 +51,22 @@ export class Synth {
     return this.ctx;
   }
 
-  // Master bus + a parallel convolution-reverb send for the echoey tail.
+  // Master bus + a parallel short, bright convolution reverb (a small metallic
+  // room — enclosed and claustrophobic, not a cathedral).
   private buildGraph(a: AudioContext): void {
     this.master = a.createGain();
     this.master.gain.value = 1;
     this.master.connect(a.destination);
 
     this.reverb = a.createConvolver();
-    this.reverb.buffer = this.makeImpulse(a, 2.6, 3.0); // long, dark cathedral tail
-    this.reverbSend = a.createGain();
-    this.reverbSend.gain.value = 1;
-    this.reverb.connect(this.reverbSend).connect(this.master);
+    this.reverb.buffer = this.makeImpulse(a, 0.45, 2.2);
+    const send = a.createGain();
+    send.gain.value = 0.5;
+    this.reverb.connect(send).connect(this.master);
   }
 
-  // Generated impulse response: exponentially-decaying noise, low-pass shaped so
-  // the tail is dark rather than hissy (a large stone-room feel, not a plate).
+  // Impulse response: exponentially-decaying noise, only lightly low-passed so
+  // the short tail stays bright/metallic.
   private makeImpulse(a: AudioContext, seconds: number, decay: number): AudioBuffer {
     const rate = a.sampleRate;
     const len = Math.floor(rate * seconds);
@@ -60,23 +77,21 @@ export class Synth {
       for (let i = 0; i < len; i++) {
         const env = Math.pow(1 - i / len, decay);
         const white = Math.random() * 2 - 1;
-        // one-pole low-pass to roll off the high fizz → a deeper, rounder tail
-        lp += 0.32 * (white - lp);
+        lp += 0.75 * (white - lp); // gentle LP: keep the highs crisp
         d[i] = lp * env;
       }
     }
     return buf;
   }
 
-  // One struck-metal partial: oscillator at f, fast attack ("strike"), long
-  // exponential decay. `wet` (0..1) sets how much goes to the reverb send.
-  private partial(
+  // One struck/tonal partial: oscillator at f, fast attack, exponential decay.
+  private tone(
     f: number,
     t0: number,
     dur: number,
     amp: number,
     type: OscillatorType = 'sine',
-    wet = 0.35,
+    wet = 0,
   ): void {
     const a = this.ctx;
     if (!a || !this.master) return;
@@ -89,89 +104,149 @@ export class Synth {
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
     o.connect(g);
     g.connect(this.master);
-    if (this.reverb && wet > 0) {
-      const send = a.createGain();
-      send.gain.value = wet;
-      g.connect(send).connect(this.reverb);
-    }
+    if (wet > 0 && this.reverb) this.sendTo(g, wet);
     o.start(t0);
     o.stop(t0 + dur + 0.05);
   }
 
+  // A shaped noise burst (the "air", "clatter", and "hiss" layers).
+  private noise(o: NoiseOpts): void {
+    const a = this.ctx;
+    if (!a || !this.master) return;
+    const rate = a.sampleRate;
+    const len = Math.max(1, Math.floor(rate * o.dur));
+    const buf = a.createBuffer(1, len, rate);
+    const d = buf.getChannelData(0);
+    const atk = Math.max(1, Math.floor(len * (o.attack ?? 0.02)));
+    const decay = o.decay ?? 1.6;
+    for (let i = 0; i < len; i++) {
+      const env = i < atk ? i / atk : Math.pow(1 - (i - atk) / (len - atk), decay);
+      d[i] = (Math.random() * 2 - 1) * env;
+    }
+    const src = a.createBufferSource();
+    src.buffer = buf;
+    const g = a.createGain();
+    g.gain.value = o.amp * this.volume;
+    let node: AudioNode = src;
+    if (o.filter) {
+      const f = a.createBiquadFilter();
+      f.type = o.filter;
+      f.frequency.setValueAtTime(o.f0, o.t0);
+      if (o.f1 !== undefined) f.frequency.exponentialRampToValueAtTime(o.f1, o.t0 + o.dur);
+      if (o.q !== undefined) f.Q.value = o.q;
+      src.connect(f);
+      node = f;
+    }
+    node.connect(g);
+    g.connect(this.master);
+    if (o.wet && o.wet > 0 && this.reverb) this.sendTo(g, o.wet);
+    src.start(o.t0);
+    src.stop(o.t0 + o.dur + 0.05);
+  }
+
+  private sendTo(node: AudioNode, wet: number): void {
+    const a = this.ctx;
+    if (!a || !this.reverb) return;
+    const s = a.createGain();
+    s.gain.value = wet;
+    node.connect(s).connect(this.reverb);
+  }
+
   /**
-   * Warning toll: a deep, dark metallic bell with inharmonic overtones and a
-   * long reverberant ring — the ominous "a check is coming" cue. Dropped about
-   * an octave from a bright bell so it reads as deep rather than chimey. Silent
-   * at Lullaby 5.
+   * Warning cue ("Shh-ting"): a damped, dissonant metallic/glass chime (2–4 kHz)
+   * layered with a fast airy noise whoosh (5 kHz+), through the short metallic
+   * room reverb. Sharp transient, medium decay, no sustain. Silent at Lullaby 5.
    */
   warn(lullaby: number): void {
     if (this.volume <= 0 || lullabySilent(lullaby)) return;
     const a = this.ensure();
     if (!a) return;
     const t = a.currentTime;
-    // Low struck fundamental (~D4) with a heavy sub-body for weight.
-    this.partial(293.7, t, 1.5, 0.17, 'sine', 0.5); // strike fundamental
-    this.partial(146.8, t, 1.7, 0.1, 'triangle', 0.55); // sub-octave body / weight
-    this.partial(293.7 * 2.76, t, 0.9, 0.06, 'sine', 0.45); // inharmonic overtone
-    this.partial(293.7 * 5.4, t + 0.004, 0.5, 0.03, 'sine', 0.4); // faint bright shimmer
-    this.partial(293.7 * 1.5, t, 0.7, 0.04, 'sine', 0.4); // hollow midrange ring
+    // Layer 1 — the ring: dampened glass/metal strike, hollow & slightly dissonant.
+    this.tone(2637, t, 0.22, 0.13, 'sine', 0.45); // bright fundamental (~E7)
+    this.tone(2637 * 1.18, t, 0.18, 0.07, 'sine', 0.4); // dissonant overtone → "eerie"
+    this.tone(3520, t + 0.002, 0.14, 0.05, 'sine', 0.35); // upper sparkle
+    // Layer 2 — the air: quick aggressive high-noise whoosh.
+    this.noise({
+      t0: t,
+      dur: 0.2,
+      amp: 0.1,
+      attack: 0.35, // ramp in = "whoosh"
+      decay: 2.0,
+      filter: 'highpass',
+      f0: 4500,
+      q: 0.7,
+      wet: 0.3,
+    });
   }
 
-  /** Great hit: short, bright, satisfying metallic "ding" with a touch of air. */
-  great(): void {
-    if (this.volume <= 0) return;
-    const a = this.ensure();
-    if (!a) return;
-    const t = a.currentTime;
-    this.partial(1567.98, t, 0.34, 0.2, 'sine', 0.3); // bright fundamental (G6)
-    this.partial(1567.98 * 2.0, t + 0.005, 0.22, 0.1, 'sine', 0.3);
-    this.partial(1567.98 * 2.93, t + 0.01, 0.14, 0.05, 'sine', 0.3); // inharmonic sparkle
-    this.partial(783.99, t, 0.3, 0.07, 'sine', 0.35); // octave-down body so it isn't thin
-  }
-
-  /** Good hit: duller, lower confirmation — no sparkle, quick decay, mostly dry. */
+  /**
+   * Good result ("Thud/Clack"): a dull, muted mechanical click, mid-low (300–800
+   * Hz), fast attack and very short decay, completely dry so it blends back into
+   * the action.
+   */
   good(): void {
     if (this.volume <= 0) return;
     const a = this.ensure();
     if (!a) return;
     const t = a.currentTime;
-    this.partial(659.3, t, 0.16, 0.1, 'sine', 0.2);
-    this.partial(880.0, t + 0.004, 0.11, 0.05, 'sine', 0.2);
+    this.tone(190, t, 0.09, 0.13, 'sine', 0); // dull body
+    this.noise({ t0: t, dur: 0.06, amp: 0.12, decay: 2.6, filter: 'lowpass', f0: 760, q: 0.6 }); // muted click
   }
 
-  /** Failure: gen-explosion stinger — discordant low cluster + filtered noise burst, into the reverb. */
+  /**
+   * Great result ("Tchick"): the same muted click as Good plus a bright, distinct
+   * metallic ping (1–3 kHz) with a touch of bite — a gear locking into place.
+   * Mostly dry with the faintest tail.
+   */
+  great(): void {
+    if (this.volume <= 0) return;
+    const a = this.ensure();
+    if (!a) return;
+    const t = a.currentTime;
+    this.tone(210, t, 0.08, 0.1, 'sine', 0); // shared click body
+    this.noise({ t0: t, dur: 0.05, amp: 0.1, decay: 2.8, filter: 'lowpass', f0: 900, q: 0.6 });
+    this.tone(2100, t, 0.12, 0.14, 'sine', 0.12); // bright metallic ping
+    this.tone(2100 * 2.0, t + 0.004, 0.07, 0.05, 'sine', 0.12); // upper-mid bite
+  }
+
+  /**
+   * Failure ("KA-BANG-psshhh"): a violent three-layer rupture — a distorted
+   * 60–100 Hz impact, a mid-range metal clatter, and a long broadband hiss tail
+   * (sparks/steam). Extreme transient, long chaotic decay (~1.6 s).
+   */
   fail(): void {
     if (this.volume <= 0) return;
     const a = this.ensure();
-    if (!a || !this.master) return;
+    if (!a) return;
     const t = a.currentTime;
-    this.partial(146.8, t, 0.7, 0.16, 'sawtooth', 0.5); // low discordant body
-    this.partial(155.6, t, 0.62, 0.12, 'sawtooth', 0.5); // beats against it = harsh
-    this.partial(98.0, t, 0.8, 0.13, 'triangle', 0.55); // deep sub
-    const len = Math.floor(a.sampleRate * 0.4);
-    const buf = a.createBuffer(1, len, a.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) {
-      const env = Math.pow(1 - i / len, 1.7);
-      d[i] = (Math.random() * 2 - 1) * env;
-    }
-    const src = a.createBufferSource();
-    src.buffer = buf;
-    const f = a.createBiquadFilter();
-    f.type = 'lowpass';
-    f.frequency.setValueAtTime(1600, t);
-    f.frequency.exponentialRampToValueAtTime(280, t + 0.35); // "whump"
-    const g = a.createGain();
-    g.gain.setValueAtTime(0.26 * this.volume, t);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
-    src.connect(f).connect(g);
-    g.connect(this.master);
-    if (this.reverb) {
-      const send = a.createGain();
-      send.gain.value = 0.4;
-      g.connect(send).connect(this.reverb);
-    }
-    src.start(t);
-    src.stop(t + 0.42);
+    // Layer 1 — the impact: deep distorted blast (60–100 Hz), short and punchy.
+    this.tone(72, t, 0.5, 0.22, 'sine', 0.3);
+    this.tone(96, t, 0.42, 0.14, 'sawtooth', 0.3); // saw = grit/distortion
+    this.noise({ t0: t, dur: 0.16, amp: 0.2, decay: 2.4, filter: 'lowpass', f0: 1800, f1: 200, wet: 0.3 }); // body "whump"
+    // Layer 2 — the shrapnel: mid-range metal clatter.
+    this.noise({
+      t0: t + 0.01,
+      dur: 0.45,
+      amp: 0.12,
+      decay: 1.4,
+      filter: 'bandpass',
+      f0: 1400,
+      f1: 700,
+      q: 1.1,
+      wet: 0.35,
+    });
+    // Layer 3 — the aftermath: sustained broadband hiss (escaping steam/sparks).
+    this.noise({
+      t0: t + 0.02,
+      dur: 1.6,
+      amp: 0.08,
+      attack: 0.04,
+      decay: 1.1,
+      filter: 'highpass',
+      f0: 3000,
+      q: 0.5,
+      wet: 0.4,
+    });
   }
 }

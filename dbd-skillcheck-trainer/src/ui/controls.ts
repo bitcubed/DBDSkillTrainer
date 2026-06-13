@@ -16,8 +16,8 @@ export interface ControlEls {
   resetBtn: HTMLButtonElement;
   chips: { hf: HTMLElement; so: HTMLElement; up: HTMLElement; lb: HTMLElement; tb: HTMLElement; ms: HTMLElement; bg: HTMLElement };
   toks: { hf: HTMLElement; so: HTMLElement; up: HTMLElement; lb: HTMLElement; bg: HTMLElement };
-  sliders: { speed: HTMLInputElement; zone: HTMLInputElement; warn: HTMLInputElement; vol: HTMLInputElement };
-  sliderVals: { speed: HTMLElement; zone: HTMLElement; warn: HTMLElement; vol: HTMLElement };
+  sliders: { speed: HTMLInputElement; zone: HTMLInputElement; warn: HTMLInputElement; vol: HTMLInputElement; dial: HTMLInputElement };
+  sliderVals: { speed: HTMLElement; zone: HTMLElement; warn: HTMLElement; vol: HTMLElement; dial: HTMLElement };
   perkTags: HTMLElement;
   stormTag: HTMLElement;
   hint: HTMLElement;

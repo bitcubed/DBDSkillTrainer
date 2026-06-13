@@ -94,6 +94,7 @@ export class Session {
   speedMul = 1;
   zoneMul = 1;
   warnLeadMs = 500;
+  dialScale = 1; // cosmetic dial size (slider); never affects timing/zone geometry
 
   charges = 0;
   stormCount = 0;
@@ -265,6 +266,7 @@ export class Session {
       madness: this.mode === 'doctor',
       w,
       h,
+      dialScale: this.dialScale,
       rng: this.rng,
     });
     this.phase = 'active';

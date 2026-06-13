@@ -52,9 +52,13 @@ export function errMs(travelDeg: number, check: ErrGeom): number {
   return (travelDeg - center) / check.degPerMs;
 }
 
-/** Dial radius for a given stage size (render + madness off-centre spawn bounds). */
-export function dialRadius(w: number, h: number): number {
-  return Math.max(70, Math.min(112, Math.min(w, h) * 0.24));
+/**
+ * Dial radius for a given stage size (render + madness off-centre spawn bounds).
+ * `scale` is a cosmetic multiplier (the dial-size slider) — it changes only how
+ * big the dial is drawn, never the timing or zone geometry, which are angular.
+ */
+export function dialRadius(w: number, h: number, scale = 1): number {
+  return Math.max(70, Math.min(112, Math.min(w, h) * 0.24)) * scale;
 }
 
 /** Travel degrees (0 = 12 o'clock, clockwise) → screen XY at radius r. */
