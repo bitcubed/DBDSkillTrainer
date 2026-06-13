@@ -1,13 +1,10 @@
-// The skill-check dial: dark backdrop, white guide ring, success zones, red
-// needle + hub. All visuals are ORIGINAL canvas drawing styled to evoke the
-// game's look (white ring, solid white great band at the leading edge,
-// white-bracketed good band, red needle) — no game assets.
+// The skill-check dial — original canvas drawing styled to the game's geometry
+// (no assets): a faint hollow track, a solid white "Great" block, a transparent
+// white-bordered "Good" zone directly after it, a bright red needle with a
+// rectangular tip notch, and a minimalist white "Space" prompt in the center.
 //
-// Visual additions beyond the prototype (cosmetic only — geometry untouched):
-//  - a darkened backdrop disc behind the dial while a check is active
-//  - crisp radial edge ticks bracketing the good zone
-//  - a short fading trail behind the needle
-//  - a brief result pulse where the check resolved
+// Cosmetic only — geometry/timing live in the engine. `dialScale` (the dial-size
+// slider) multiplies every drawn dimension; it never affects timing or zones.
 
 import { dialRadius, posXY } from '../engine/geometry';
 import type { Result, SkillCheck } from '../engine/types';
@@ -33,6 +30,7 @@ function arcBand(
   dir: 1 | -1,
   fill: string | null,
   stroke: string | null,
+  lw = 2,
 ): void {
   // travel degrees -> screen theta (CW positive); dir=-1 mirrors
   const a = ((dir * thA - 90) * Math.PI) / 180;
@@ -47,12 +45,12 @@ function arcBand(
   }
   if (stroke) {
     ctx.strokeStyle = stroke;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = lw;
     ctx.stroke();
   }
 }
 
-/** Thin radial tick at a travel angle, bracketing a zone edge (DBD-style). */
+/** Thin radial tick at a travel angle, bracketing a zone edge. */
 function edgeTick(
   ctx: CanvasRenderingContext2D,
   cx: number,
@@ -61,14 +59,44 @@ function edgeTick(
   dir: 1 | -1,
   rIn: number,
   rOut: number,
+  lw: number,
 ): void {
   const [x1, y1] = posXY(cx, cy, dir * thetaDeg, rIn);
   const [x2, y2] = posXY(cx, cy, dir * thetaDeg, rOut);
   ctx.strokeStyle = 'rgba(240,244,242,0.95)';
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = lw;
   ctx.beginPath();
   ctx.moveTo(x1, y1);
   ctx.lineTo(x2, y2);
+  ctx.stroke();
+}
+
+function roundRectPath(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+): void {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+/** Minimalist white "Space" bar / console-button prompt in the dial center. */
+function centerPrompt(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number): void {
+  const w = 28 * s;
+  const h = 11 * s;
+  roundRectPath(ctx, cx - w / 2, cy - h / 2, w, h, 3 * s);
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+  ctx.lineWidth = 1.5 * s;
   ctx.stroke();
 }
 
@@ -98,7 +126,6 @@ export function drawDial(
   const cy = on ? c.cy : h / 2;
   const scale = state.dialScale ?? 1;
   const R = dialRadius(w, h, scale);
-
   const pal = state.palette ?? DEFAULT_PALETTE;
 
   // Result pulse where the last check resolved (fades over PULSE_MS).
@@ -113,7 +140,7 @@ export function drawDial(
             ? `rgba(240,244,242,${a * 0.7})`
             : hexToRgba(pal.miss, a);
       ctx.strokeStyle = col;
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 3 * scale;
       ctx.beginPath();
       ctx.arc(state.pulse.cx, state.pulse.cy, R * (1 + 0.22 * t), 0, Math.PI * 2);
       ctx.stroke();
@@ -123,101 +150,87 @@ export function drawDial(
   ctx.save();
   ctx.globalAlpha = state.running ? 1 : 0.32;
 
-  // Darkened backdrop disc while a check is up — the game dims behind the dial.
-  if (on) {
-    const dark = ctx.createRadialGradient(cx, cy, R * 0.3, cx, cy, R * 1.45);
-    dark.addColorStop(0, 'rgba(2,3,4,0.42)');
-    dark.addColorStop(0.8, 'rgba(2,3,4,0.28)');
-    dark.addColorStop(1, 'rgba(2,3,4,0)');
-    ctx.fillStyle = dark;
-    ctx.beginPath();
-    ctx.arc(cx, cy, R * 1.45, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Dial face: faint inner disc + the white ring.
-  const grad = ctx.createRadialGradient(cx, cy, R * 0.2, cx, cy, R * 1.06);
-  grad.addColorStop(0, 'rgba(180,190,188,0.05)');
-  grad.addColorStop(1, 'rgba(180,190,188,0)');
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.arc(cx, cy, R * 1.06, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Outer thin guide ring (the track the pointer rides).
-  ctx.strokeStyle = 'rgba(238,242,240,0.85)';
-  ctx.lineWidth = 2.5;
-  ctx.shadowColor = 'rgba(240,244,242,.30)';
-  ctx.shadowBlur = 6;
+  // Track: a thin, faint hollow ring (the path the needle rides).
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+  ctx.lineWidth = 2 * scale;
   ctx.beginPath();
   ctx.arc(cx, cy, R, 0, Math.PI * 2);
   ctx.stroke();
-  ctx.shadowBlur = 0;
+
+  // Center prompt (the "Space" key graphic).
+  centerPrompt(ctx, cx, cy, scale);
 
   if (on) {
     const gs = c.zoneStartDeg;
     const ge = gs + c.greatDeg;
     const de = ge + c.goodDeg;
-    const rIn = R - 9 * scale;
-    const rOut = R + 9 * scale;
+    const half = 7.5 * scale; // ~15px band thickness
+    const rIn = R - half;
+    const rOut = R + half;
+    const tickLw = 1.5 * scale;
 
-    // Good zone: light translucent fill + white outline, bracketed by edge ticks.
+    // Good zone: transparent fill with solid white borders, directly after Great.
     if (c.goodDeg > 0) {
-      arcBand(ctx, cx, cy, ge, de, rIn, rOut, c.dir, 'rgba(240,244,242,0.16)', null);
-      arcBand(ctx, cx, cy, ge, de, rIn, rOut, c.dir, null, 'rgba(240,244,242,0.95)');
-      edgeTick(ctx, cx, cy, de, c.dir, rIn - 2 * scale, rOut + 2 * scale);
+      arcBand(ctx, cx, cy, ge, de, rIn, rOut, c.dir, 'rgba(255,255,255,0.05)', null);
+      arcBand(ctx, cx, cy, ge, de, rIn, rOut, c.dir, null, 'rgba(255,255,255,0.92)', 2 * scale);
+      edgeTick(ctx, cx, cy, de, c.dir, rIn - 2 * scale, rOut + 2 * scale, tickLw);
     }
-    // Great zone: solid bright white band at the leading edge with a soft glow.
+    // Great zone: a small, solid, opaque white block with a soft glow.
     ctx.shadowColor = 'rgba(255,255,255,.55)';
     ctx.shadowBlur = 8;
-    arcBand(ctx, cx, cy, gs, ge, rIn, rOut, c.dir, '#fbfdfc', null);
+    arcBand(ctx, cx, cy, gs, ge, rIn, rOut, c.dir, '#ffffff', null);
     ctx.shadowBlur = 0;
-    edgeTick(ctx, cx, cy, gs, c.dir, rIn - 2 * scale, rOut + 2 * scale);
+    edgeTick(ctx, cx, cy, gs, c.dir, rIn - 2 * scale, rOut + 2 * scale, tickLw);
 
-    // Pointer: the DBD-style white needle — a slim tapered triangle sweeping from
-    // the hub to just past the ring — with a short fading trail behind it.
+    // Needle: a bright red line from just outside the center prompt to past the
+    // ring, with a short fading trail and a chunky rectangular tip notch.
     const travel = (now - c.t0) * c.degPerMs;
     const th = c.dir * travel;
-    const TIP_R = R + 13 * scale;
-    const HALF_DEG = 2.0; // angular half-width of the needle base
-    const BASE_R = 9 * scale;
+    const baseR = 15 * scale;
+    const tipR = R + 8 * scale;
 
-    const needle = (angle: number, alpha: number, glow: boolean): void => {
-      const [tx, ty] = posXY(cx, cy, angle, TIP_R);
-      const [blx, bly] = posXY(cx, cy, angle - c.dir * HALF_DEG, BASE_R);
-      const [brx, bry] = posXY(cx, cy, angle + c.dir * HALF_DEG, BASE_R);
-      if (glow) {
-        ctx.shadowColor = `rgba(255,255,255,${0.5 * alpha})`;
-        ctx.shadowBlur = 7;
-      }
-      ctx.fillStyle = `rgba(245,248,247,${alpha})`;
-      ctx.beginPath();
-      ctx.moveTo(tx, ty);
-      ctx.lineTo(blx, bly);
-      ctx.lineTo(brx, bry);
-      ctx.closePath();
-      ctx.fill();
-      if (glow) ctx.shadowBlur = 0;
-    };
-
+    ctx.lineCap = 'round';
     for (let i = state.reducedMotion ? 0 : 3; i >= 1; i--) {
-      needle(th - c.dir * 3.4 * i, 0.12 / i, false);
+      const ghost = th - c.dir * 3.4 * i;
+      const [gx1, gy1] = posXY(cx, cy, ghost, baseR);
+      const [gx2, gy2] = posXY(cx, cy, ghost, tipR);
+      ctx.strokeStyle = `rgba(232,38,28,${0.14 / i})`;
+      ctx.lineWidth = 3 * scale;
+      ctx.beginPath();
+      ctx.moveTo(gx1, gy1);
+      ctx.lineTo(gx2, gy2);
+      ctx.stroke();
     }
-    needle(th, 0.98, true);
+    const [x1, y1] = posXY(cx, cy, th, baseR);
+    const [x2, y2] = posXY(cx, cy, th, tipR);
+    ctx.shadowColor = 'rgba(224,36,27,.65)';
+    ctx.shadowBlur = 7;
+    ctx.strokeStyle = '#e8261c';
+    ctx.lineWidth = 3 * scale;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    // Tip notch: a short, thick red segment straddling the ring (the "arrow").
+    const [n1x, n1y] = posXY(cx, cy, th, R - 3 * scale);
+    const [n2x, n2y] = posXY(cx, cy, th, R + 6 * scale);
+    ctx.lineCap = 'butt';
+    ctx.lineWidth = 7 * scale;
+    ctx.beginPath();
+    ctx.moveTo(n1x, n1y);
+    ctx.lineTo(n2x, n2y);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
 
-    // White hub with a faint core, matching the monochrome game dial.
-    ctx.fillStyle = 'rgba(245,248,247,0.95)';
+    // Red pivot hub.
+    ctx.fillStyle = '#e8261c';
     ctx.beginPath();
-    ctx.arc(cx, cy, 4.2 * scale, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(120,130,128,0.9)';
-    ctx.beginPath();
-    ctx.arc(cx, cy, 1.6 * scale, 0, Math.PI * 2);
+    ctx.arc(cx, cy, 3.2 * scale, 0, Math.PI * 2);
     ctx.fill();
   } else {
-    ctx.fillStyle = 'rgba(232,236,234,.45)';
+    ctx.fillStyle = 'rgba(232,80,72,.6)';
     ctx.beginPath();
-    ctx.arc(cx, cy, 3.5 * scale, 0, Math.PI * 2);
+    ctx.arc(cx, cy, 3 * scale, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
