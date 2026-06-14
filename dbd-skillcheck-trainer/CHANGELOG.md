@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.2.4 — 2026-06-14 — Smoother animation, tighter input timing, roomier layout
+
+### Changed
+- **Presses judged at the event's own timestamp.** Space/click now use
+  `event.timeStamp` (when the key/button actually fired) instead of a
+  `performance.now()` read inside the handler — removes dispatch jitter from the
+  hit, which matters against the ~33 ms great window.
+- **Render on the RAF presentation timestamp.** The frame loop uses the timestamp
+  `requestAnimationFrame` passes in (one consistent clock per frame, aligned to
+  when the frame is shown) rather than a fresh `performance.now()`.
+- **Cheaper needle render.** The needle's trail ghosts draw without a drop shadow
+  (`shadowBlur` is the costly per-frame op); only the live needle keeps its glow.
+  Cuts per-frame stutter on lower-end GPUs; the live needle is unchanged.
+- **Roomier layout.** Wider page (max-width 1200 → 1320 px), more vertical spacing
+  between sections, larger slider/stat grids, and the trainer/guide split now
+  stacks to a full-width single column at ≤1040 px (was 920) so it isn't cramped.
+
+### Note
+- The **dial-size slider** (0.5–1.3×, cosmetic — never affects timing/zones) was
+  already present as of 0.2.3; verified it scales the dial as expected.
+
 ## 0.2.3 — 2026-06-14 — Real cue audio + 1:1 dial + check-only visibility
 
 ### Changed

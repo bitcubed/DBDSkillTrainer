@@ -8,11 +8,11 @@
 html,body{background:var(--bg); color:var(--ink);
   font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   -webkit-font-smoothing:antialiased;}
-.wrap{max-width:1200px; margin:0 auto; padding:14px 22px 28px;}
+.wrap{max-width:1320px; margin:0 auto; padding:18px 30px 34px;}
 .cap{font-size:10px; letter-spacing:.22em; text-transform:uppercase; color:var(--mut); font-weight:700;}
 
 /* ---- mode tabs ---- */
-.tabs{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;}
+.tabs{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;}
 .tab{flex:1 1 auto; min-width:86px; padding:9px 6px; text-align:center; cursor:pointer;
   background:var(--panel); border:1px solid var(--line); border-radius:6px;
   font-size:11px; letter-spacing:.18em; text-transform:uppercase; font-weight:700; color:var(--mut);
@@ -95,40 +95,40 @@ select:focus,button:focus,input:focus,.tab:focus-visible,.chip:focus-visible{out
 .pfill{height:100%; width:0%; background:linear-gradient(90deg,#9aa6a0,#e8ecea); transition:width .2s linear;}
 
 /* ---- stats ---- */
-.stats{display:grid; grid-template-columns:repeat(6,1fr); gap:6px; margin-top:12px;}
+.stats{display:grid; grid-template-columns:repeat(6,1fr); gap:9px; margin-top:18px;}
 @media (max-width:560px){ .stats{grid-template-columns:repeat(3,1fr);} }
-.stat{background:var(--panel); border:1px solid var(--line); border-radius:7px; padding:9px 8px 8px; text-align:center;}
+.stat{background:var(--panel); border:1px solid var(--line); border-radius:7px; padding:11px 8px 10px; text-align:center;}
 .stat .v{font-size:19px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1.1;}
 .stat .v.gold{color:var(--gold);} .stat .v.red{color:var(--fail);}
 .stat .k{margin-top:3px; font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:var(--mut); font-weight:700;}
 
 /* ---- timing tape ---- */
-.tape{margin-top:10px; background:var(--panel); border:1px solid var(--line); border-radius:7px; padding:10px 12px 8px;}
+.tape{margin-top:14px; background:var(--panel); border:1px solid var(--line); border-radius:7px; padding:12px 14px 10px;}
 .tapehead{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;}
 #tapeRead{font-size:11px; color:var(--ink); font-variant-numeric:tabular-nums; letter-spacing:.06em;}
 .tape canvas{display:block; width:100%; height:46px;}
 
 /* ---- controls ---- */
-.ctrls{margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+.ctrls{margin-top:18px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
 .btn{padding:10px 18px; border-radius:6px; border:1px solid var(--line); background:var(--panel2);
   color:var(--ink); font-size:12px; letter-spacing:.2em; text-transform:uppercase; font-weight:800; cursor:pointer;}
 .btn.primary{border-color:#6e2420; background:linear-gradient(180deg,#3a1512,#27100e); color:#f3d9d7;}
 .btn.primary:hover{background:linear-gradient(180deg,#481a16,#2c1210);}
 .btn:hover{border-color:#4a5560;}
-.chips{display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;}
+.chips{display:flex; gap:8px; flex-wrap:wrap; margin-top:14px;}
 .chip{cursor:pointer; user-select:none; padding:7px 10px; border-radius:6px; border:1px solid var(--line);
   background:var(--panel); font-size:10px; letter-spacing:.14em; text-transform:uppercase; font-weight:700; color:var(--mut);}
 .chip.on{color:var(--gold); border-color:#5a4d22; background:rgba(232,195,74,.06);}
 .chip .tok{color:var(--ink); margin-left:5px; letter-spacing:.05em;}
 .chip.disabled{opacity:.35; pointer-events:none;}
-.sliders{display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:8px 16px; margin-top:12px;
-  background:var(--panel); border:1px solid var(--line); border-radius:7px; padding:10px 12px;}
+.sliders{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px 24px; margin-top:16px;
+  background:var(--panel); border:1px solid var(--line); border-radius:7px; padding:14px 16px;}
 .sl{display:flex; flex-direction:column; gap:4px;}
 .sl .lab{display:flex; justify-content:space-between; font-size:9px; letter-spacing:.14em;
   text-transform:uppercase; color:var(--mut); font-weight:700;}
 .sl .lab b{color:var(--ink); font-variant-numeric:tabular-nums; letter-spacing:.04em;}
 input[type=range]{accent-color:#b8412f; width:100%;}
-.foot{margin-top:12px; font-size:11px; color:var(--dim); line-height:1.55;}
+.foot{margin-top:18px; font-size:11px; color:var(--dim); line-height:1.6;}
 .foot b{color:var(--mut); font-weight:700;}
 
 /* ---- progression dashboard ---- */
@@ -163,8 +163,8 @@ body.cb{ --fail:#4d9fd6; }
 .chips.display{margin-top:8px;}
 
 /* ---- two-column layout: trainer + guide sidebar ---- */
-.layout{display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:20px; align-items:start;}
-@media (max-width:920px){ .layout{grid-template-columns:1fr;} }
+.layout{display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:30px; align-items:start;}
+@media (max-width:1040px){ .layout{grid-template-columns:1fr;} }
 .main{min-width:0;}
 
 /* background-noise layer inside the stage */

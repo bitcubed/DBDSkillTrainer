@@ -303,9 +303,11 @@ export function drawDial(
     const nIn = 8 * scale;
     const nOut = R + 7 * scale;
     const hw = 1.3 * scale;
+    // Trail ghosts draw without a shadow — shadowBlur is the costly part of the
+    // per-frame needle render, and only the live needle below needs the glow.
     if (!state.reducedMotion) {
       for (let i = 3; i >= 1; i--) {
-        bloodStreak(ctx, cx, cy, th - c.dir * 3.2 * i, nIn, nOut, hw * (1 - 0.14 * i), 0.09 / i, 3 * scale);
+        bloodStreak(ctx, cx, cy, th - c.dir * 3.2 * i, nIn, nOut, hw * (1 - 0.14 * i), 0.09 / i, 0);
       }
     }
     bloodStreak(ctx, cx, cy, th, nIn, nOut, hw, 0.95, 5 * scale);

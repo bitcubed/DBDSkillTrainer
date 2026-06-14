@@ -403,8 +403,10 @@ function frame(now: number): void {
     inputMode: ui.input,
   });
 }
-function loop(): void {
-  frame(performance.now());
+// Render on the RAF presentation timestamp (not a fresh performance.now()): one
+// consistent clock per frame, aligned to when the frame is actually shown.
+function loop(ts: number): void {
+  frame(ts);
   requestAnimationFrame(loop);
 }
 
@@ -419,7 +421,9 @@ window.addEventListener('keydown', (e) => {
   // behavior (activating focused buttons, opening selects) stays intact.
   if (e.code === 'Space' && ui.input !== 'mouse' && session.running) {
     e.preventDefault();
-    if (!e.repeat) press(performance.now());
+    // Judge at the event's own timestamp (when the key actually went down), not
+    // after handler dispatch — tighter for the ~33 ms great window.
+    if (!e.repeat) press(e.timeStamp || performance.now());
   }
 });
 // Left click (or tap) anywhere counts as a press — matches an M1 skill-check
@@ -429,7 +433,7 @@ document.addEventListener('pointerdown', (e) => {
   if (ui.input === 'space' || e.button !== 0 || !session.running) return;
   if ((e.target as Element).closest('button,select,input,a,.chip,.tab')) return;
   e.preventDefault();
-  press(performance.now());
+  press(e.timeStamp || performance.now());
 });
 
 // ---------------- session control ----------------
