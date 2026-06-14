@@ -25,6 +25,15 @@ Owner: Jonah (plays DBD; wants an accurate, research-grounded trainer he can dri
 
 ## 2. Current state (what already exists)
 
+**Update 2026-06-14 — audio embedded; dial reworked to 1:1.** The owner provided
+three skill-check recordings (check-appears / good / great) and screenshots. After
+two synthesis passes did not satisfy, the owner chose to embed the recordings
+directly (see §5 — the synth-only rule was relaxed). `warn`/`good`/`great` now play
+the bundled mp3s (`src/assets/`, via Vite); `fail` stays synthesized. The dial was
+slimmed toward the in-game proportions (thin ring/band, thin tapered "blood streak"
+needle) and now appears only during a check, vanishing ~100 ms after it resolves.
+Typecheck/lint clean, 118 tests pass, `vite build` bundles the audio and emits `dist/`.
+
 **Update 2026-06-11 — ALL spec §11 stages (1–9) complete.** The port lives in
 `dbd-skillcheck-trainer/` (Vite + strict TypeScript + Vitest; engine is
 framework-free TS + Canvas). Stages 1–5: typed engine modules, synthesized
@@ -146,9 +155,18 @@ practice distribution maps directly onto it:
 
 ## 5. Locked decisions / constraints
 
-- **No copyrighted assets, ever.** No DBD audio files, sprites, fonts, or art. All
-  sounds are synthesized to *resemble* the character of the real ones; all visuals are
-  original. This is non-negotiable and must carry into the full project.
+- **Audio: the owner's recorded cues are embedded (since 2026-06-14).** The
+  original rule was "no copyrighted assets, ever — all sounds synthesized." After two
+  synthesis passes the owner decided fidelity mattered more and opted to embed the
+  three real recordings (`warn`/`good`/`great`); the `fail` cue stays synthesized.
+  **Caveat the owner accepted:** these are game-derived sounds, so the public GitHub
+  Pages build now ships audio that is most likely Behaviour Interactive's copyright —
+  fine for personal use, a real risk for a public deploy. All **visuals remain
+  original** (Canvas-drawn; no sprites or screenshots embedded).
+  **Mitigation (chosen 2026-06-14):** keep the audio but add an attribution /
+  non-affiliation disclaimer — in the UI footer, the `README`, and a root
+  `DISCLAIMER.md` — with a takedown path via the repo's GitHub issues. This
+  addresses notice/optics, not the underlying copyright risk.
 - **The trainer deliberately deviates from the game in a few places, and labels them:**
   - Merciless Storm runs **unlimited** here — a miss costs progress but never blocks the
     gen or ends the run, so you can drill the continuous cadence indefinitely.

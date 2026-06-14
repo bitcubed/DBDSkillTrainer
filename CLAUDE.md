@@ -8,7 +8,7 @@ Read in this order before doing anything:
 
 Hard constraints (full list in context doc §5):
 
-- No copyrighted DBD assets, ever — audio stays synthesized, visuals stay original.
+- Audio: the `warn`/`good`/`great` cues are the owner's embedded recordings (rule relaxed 2026-06-14 — see context §5, incl. the accepted copyright caveat for the public deploy); the `fail` cue stays synthesized. Visuals stay original (Canvas-drawn; no sprites/screenshots/fonts).
 - Approximated values stay labeled in the UI (warning lead, Lullaby scaling, unlimited storm, browser-latency caveat).
 - Don't re-add Healing or Wiggle.
 - Static deploy; the engine stays framework-free TypeScript + Canvas.

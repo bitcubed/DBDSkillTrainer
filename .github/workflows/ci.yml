@@ -44,6 +44,10 @@ jobs:
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     needs: verify
     runs-on: ubuntu-latest
+    # Serialize Pages deploys so overlapping pushes can't race the environment.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     permissions:
       pages: write
       id-token: write

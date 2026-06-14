@@ -1,0 +1,3 @@
+# Per-machine Claude Code permission overrides — local to each checkout,
+# not meant for the shared (public) repo.
+.claude/settings.local.json

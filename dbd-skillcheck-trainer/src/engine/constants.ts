@@ -53,7 +53,7 @@ export const ERRS_CAP = 200; // timing-error ring buffer size
 export const APPROXIMATIONS = {
   warnLeadDefaultMs: 500, // exact game value unpublished → slider
   lullabyScaling: 'linear', // per-token gong reduction; real values unpublished
-  audio: 'synthesized', // not game audio (copyright)
+  audio: 'embedded recordings (warn/good/great); synthesized fail', // §5 relaxation 2026-06-14
   bgNoise: 'original', // invented for training
   stormTiming: 'unlimited', // trainer never blocks the gen (game blocks 16/18/20s)
   inputLatency: 'browser ≠ in-game pipeline',

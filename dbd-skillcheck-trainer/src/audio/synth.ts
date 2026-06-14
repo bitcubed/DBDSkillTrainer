@@ -1,17 +1,19 @@
-// Synthesized audio stand-ins — NOT game audio (copyright; see context doc §5).
-// These recreate the *character* of DBD's skill-check cues from a synthesis
-// brief, never the copyrighted files themselves:
-//   warn  a clean, sharp high glassy "ting" (~1.8 kHz triangle), dry.
-//   good  a muted square "knock" gliding 300→100 Hz under a 500 Hz low-pass.
-//   great a bright layered "shing" (sine 2 kHz + square 1.2 kHz) with chorus.
-//   fail  a distorted saw blast (80→40 Hz) + stuttering high-passed noise zap.
-// Everything is generated at runtime; no audio samples ship in the repo.
+// Skill-check cue audio. warn / good / great play the owner's recorded cue
+// files, bundled by Vite from src/assets. (Context section 5's "all sounds are
+// synthesized, no embedded audio" rule was relaxed on 2026-06-14 at the owner's
+// request, trading the copyright caveat for an exact match to the game; see the
+// context doc.) fail stays synthesized - no recording was supplied.
 
 import { lullabySilent } from '../engine/perks';
+import warnUrl from '../assets/dbd_check_start.mp3';
+import goodUrl from '../assets/dbd_good_skill_check.mp3';
+import greatUrl from '../assets/dbd_great_skillcheck.mp3';
 
 interface WindowWithWebkitAC extends Window {
   webkitAudioContext?: typeof AudioContext;
 }
+
+type CueName = 'warn' | 'good' | 'great';
 
 export class Synth {
   /** 0..1 master volume. */
@@ -19,8 +21,10 @@ export class Synth {
 
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
+  private samples: Partial<Record<CueName, AudioBuffer>> = {};
+  private samplesRequested = false;
 
-  /** Create/resume the context — must be called from a user gesture at least once. */
+  /** Create/resume the context - must be called from a user gesture at least once. */
   ensure(): AudioContext | null {
     if (typeof AudioContext === 'undefined' && !(window as WindowWithWebkitAC).webkitAudioContext) {
       return null;
@@ -33,11 +37,66 @@ export class Synth {
       this.master.connect(this.ctx.destination);
     }
     if (this.ctx.state === 'suspended') void this.ctx.resume();
+    void this.loadSamples(this.ctx);
     return this.ctx;
   }
 
-  // One oscillator with a fast-attack / exponential-decay envelope into `dest`.
-  // Optional frequency glide (freq → glideTo across the note).
+  // Fetch + decode the three cue files once, after the context exists.
+  private async loadSamples(a: AudioContext): Promise<void> {
+    if (this.samplesRequested) return;
+    this.samplesRequested = true;
+    const items: [CueName, string][] = [
+      ['warn', warnUrl],
+      ['good', goodUrl],
+      ['great', greatUrl],
+    ];
+    await Promise.all(
+      items.map(async ([key, url]) => {
+        try {
+          const data = await (await fetch(url)).arrayBuffer();
+          this.samples[key] = await a.decodeAudioData(data);
+        } catch {
+          // Leave undefined; the cue no-ops until (if) decoding succeeds.
+        }
+      }),
+    );
+  }
+
+  // Play a decoded cue through the master bus at the current volume. A fresh
+  // BufferSource per call lets cues overlap (rapid drill checks).
+  private playSample(buf: AudioBuffer | undefined, gainMul = 1): void {
+    if (!buf || !this.ctx || !this.master || this.volume <= 0) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    const g = this.ctx.createGain();
+    g.gain.value = this.volume * gainMul;
+    src.connect(g).connect(this.master);
+    src.start();
+  }
+
+  /** Warning cue (check appears): the recorded check-start sound. Silent at Lullaby 5. */
+  warn(lullaby: number): void {
+    if (this.volume <= 0 || lullabySilent(lullaby)) return;
+    this.ensure();
+    this.playSample(this.samples.warn);
+  }
+
+  /** Good result: the recorded good-skill-check sound. */
+  good(): void {
+    if (this.volume <= 0) return;
+    this.ensure();
+    this.playSample(this.samples.good);
+  }
+
+  /** Great result: the recorded great-skill-check sound. */
+  great(): void {
+    if (this.volume <= 0) return;
+    this.ensure();
+    this.playSample(this.samples.great);
+  }
+
+  // One oscillator with a fast-attack / exponential-decay envelope into `dest`
+  // (used only by the synthesized fail cue). Optional frequency glide.
   private osc(
     a: AudioContext,
     type: OscillatorType,
@@ -63,7 +122,7 @@ export class Synth {
   }
 
   // Soft-clip distortion curve for the failure blast. (Return type is inferred
-  // as Float32Array<ArrayBuffer> — annotating it widens to ArrayBufferLike,
+  // as Float32Array<ArrayBuffer> - annotating it widens to ArrayBufferLike,
   // which WaveShaperNode.curve rejects under TS 5.7+.)
   private distortionCurve(amount: number) {
     const n = 1024;
@@ -77,73 +136,10 @@ export class Synth {
   }
 
   /**
-   * Warning cue: a single sharp, high-pitched glassy "ting" that rings out
-   * cleanly — fast attack, moderate decay, no sustain, no reverb. Silent at
-   * Lullaby 5.
-   */
-  warn(lullaby: number): void {
-    if (this.volume <= 0 || lullabySilent(lullaby)) return;
-    const a = this.ensure();
-    if (!a || !this.master) return;
-    const t = a.currentTime;
-    this.osc(a, 'triangle', 1800, t, 0.4, 0.2, this.master, 0.01); // the clean ting
-    this.osc(a, 'sine', 3600, t, 0.18, 0.05, this.master, 0.01); // faint octave = glassy sheen
-  }
-
-  /**
-   * Good result: a subtle, muted mechanical knock — a square wave dropping
-   * 300→100 Hz under a heavy 500 Hz low-pass so there's no brightness. Dry,
-   * short, unobtrusive.
-   */
-  good(): void {
-    if (this.volume <= 0) return;
-    const a = this.ensure();
-    if (!a || !this.master) return;
-    const t = a.currentTime;
-    const lp = a.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.frequency.value = 500;
-    lp.connect(this.master);
-    this.osc(a, 'square', 300, t, 0.1, 0.16, lp, 0.01, 100); // knock, glide down
-  }
-
-  /**
-   * Great result: a bright, shimmering metallic "shing" — layered sine (2 kHz)
-   * and square (1.2 kHz) through a light chorus (a modulated delay) for the
-   * shimmer. Fast attack, longer decay, cuts through the mix.
-   */
-  great(): void {
-    if (this.volume <= 0) return;
-    const a = this.ensure();
-    if (!a || !this.master) return;
-    const t = a.currentTime;
-
-    // Sum the two oscillators into one bus, then split to a dry path + chorus.
-    const bus = a.createGain();
-    bus.gain.value = 1;
-    bus.connect(this.master); // dry
-
-    const delay = a.createDelay();
-    delay.delayTime.value = 0.025;
-    const lfo = a.createOscillator();
-    lfo.frequency.value = 3.2;
-    const lfoGain = a.createGain();
-    lfoGain.gain.value = 0.006; // ±6 ms modulation = shimmer
-    lfo.connect(lfoGain).connect(delay.delayTime);
-    const wet = a.createGain();
-    wet.gain.value = 0.5;
-    bus.connect(delay).connect(wet).connect(this.master);
-    lfo.start(t);
-    lfo.stop(t + 0.6);
-
-    this.osc(a, 'sine', 2000, t, 0.5, 0.16, bus, 0.02);
-    this.osc(a, 'square', 1200, t, 0.45, 0.08, bus, 0.02);
-  }
-
-  /**
-   * Failure: a loud, bass-heavy explosion with an electrical zap — a distorted
-   * sawtooth blast gliding 80→40 Hz, plus high-passed white noise with a
+   * Failure: a loud, bass-heavy explosion with an electrical zap - a distorted
+   * sawtooth blast gliding 80->40 Hz, plus high-passed white noise with a
    * stuttering envelope (sparks/steam). Instant attack, ~1.5 s chaotic decay.
+   * Still synthesized (no fail recording supplied).
    */
   fail(): void {
     if (this.volume <= 0) return;
@@ -151,7 +147,7 @@ export class Synth {
     if (!a || !this.master) return;
     const t = a.currentTime;
 
-    // Layer 1 — the blast: distorted low sawtooth, 80→40 Hz.
+    // Layer 1 - the blast: distorted low sawtooth, 80->40 Hz.
     const shaper = a.createWaveShaper();
     shaper.curve = this.distortionCurve(45);
     shaper.oversample = '2x';
@@ -160,7 +156,7 @@ export class Synth {
     shaper.connect(blastGain).connect(this.master);
     this.osc(a, 'sawtooth', 80, t, 0.7, 0.6, shaper, 0.001, 40);
 
-    // Layer 2 — the zap/sparks: high-passed white noise with a stuttering,
+    // Layer 2 - the zap/sparks: high-passed white noise with a stuttering,
     // randomized volume envelope over a long decay.
     const rate = a.sampleRate;
     const len = Math.floor(rate * 1.5);

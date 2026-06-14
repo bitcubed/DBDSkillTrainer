@@ -400,6 +400,7 @@ function frame(now: number): void {
     reducedMotion: reducedMotionOn(),
     palette: pal,
     dialScale: session.dialScale,
+    inputMode: ui.input,
   });
 }
 function loop(): void {

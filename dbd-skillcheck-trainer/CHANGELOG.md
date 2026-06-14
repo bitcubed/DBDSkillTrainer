@@ -1,5 +1,54 @@
 # Changelog
 
+## 0.2.3 — 2026-06-14 — Real cue audio + 1:1 dial + check-only visibility
+
+### Changed
+- **Embedded the owner's recorded cues.** `warn`/`good`/`great` now play the
+  bundled mp3 files (`src/assets/`, imported through Vite; HTMLAudioElement in the
+  prototype) instead of synthesis - after two synthesis passes the owner opted for
+  an exact match. `fail` stays synthesized. This relaxes the synth-only rule in
+  context §5; the public build now ships game-derived audio (owner-accepted
+  copyright caveat).
+- **Dial slimmed to 1:1.** Thinner track ring, thinner success-zone band and
+  shorter edge ticks, and a thinner tapered needle - matched to a zoomed in-game
+  screenshot (it was reading too thick/large).
+- **Dial shows only during a check.** The ring/zone/needle render only while a
+  check is active and for ~100 ms after it resolves, then the canvas clears -
+  mirroring DBD, where the skill-check circle is not on screen between checks.
+
+## 0.2.2 — 2026-06-14 — Closer audio match + "blood streak" needle
+
+### Changed
+- **Cues re-fitted by spectrum, not by ear** (`audio/synth.ts`, prototype): each
+  recording was STFT-analyzed for its per-band energy over the first 300 ms. The
+  cues are now additive sine partials plus a short band-limited noise burst (the
+  dense ~65-80% broadband attack the earlier pure-tone version missed). `good`
+  and `great` are much brighter - their energy sits in 1.6-6 kHz, not the low
+  body - matching the recordings. Per-band L1 error vs the recordings dropped
+  ~249 -> ~35 points (`good` alone 154 -> 10). Synthesis only; no samples (§5).
+- **Needle is now a tapered "blood streak"** (`render/dial.ts`, prototype): a
+  double-pointed shape that tapers to a point and fades to transparent at both
+  ends, fullest and opaque in the middle, with a soft red smear. Replaces the
+  plain line + light tip marker; same thickness; honors reduced-motion.
+
+## 0.2.1 — 2026-06-14 — Audio + dial tuned to real references
+
+### Changed
+- **Synthesized cues retuned** (`audio/synth.ts`, prototype `metalPartial`
+  recipes): the owner supplied three real skill-check recordings (check-appears
+  / good / great). Per context §5 they were used as *references only* — no
+  samples are embedded or shipped. Each cue's partials, attack, and decay were
+  re-derived from the recordings' measured spectra: `warn` is now a ~1.1 kHz
+  metallic bell with inharmonic partials and a soft swell; `great` a ~2 kHz
+  "shing" over a 1.1 kHz body with high shimmer and a longer ring; `good` a
+  darker, shorter ~520 Hz confirm, kept clearly distinct from `great`.
+- **Dial center input cue** (`render/dial.ts`, prototype `draw`): the center now
+  draws the in-game keybind prompt — a "Space" key chip, switching to a mouse
+  glyph with the left button lit when the input mode is click-only (`both` shows
+  Space). Added a light needle-tip marker. All original Canvas, matched to a
+  mid-check screenshot; no assets used. `inputMode` is now threaded into
+  `DialState` from `main.ts`.
+
 ## 0.2.0 — 2026-06-11 — History, dashboard, accessibility, CI (spec §11 stages 6–9)
 
 ### Added

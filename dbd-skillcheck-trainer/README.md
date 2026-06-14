@@ -6,9 +6,10 @@ cross-session progress tracking.
 
 Built per `../CLAUDE_CODE_PROJECT_SPEC.md` from the single-file reference
 prototype `../dbd-skillcheck-trainer.html`. Game data verified against
-deadbydaylight.wiki.gg (see `../COWORK_PROJECT_CONTEXT.md` §3). **No
-copyrighted DBD assets anywhere** — all audio is synthesized, all visuals are
-original canvas drawing.
+deadbydaylight.wiki.gg (see `../COWORK_PROJECT_CONTEXT.md` §3). The
+`warn`/`good`/`great` cues are the owner's embedded recordings (`src/assets/`); the
+`fail` cue is synthesized, and **all visuals are original** canvas drawing. The audio
+relaxation and its copyright caveat for the public deploy are documented in context §5.
 
 ## Run
 
@@ -40,7 +41,7 @@ Source: GitHub Actions in the repo settings).
 
 - `src/engine/` — framework-free game logic (constants are the verified
   source of truth; approximations are labeled in `APPROXIMATIONS`).
-- `src/audio/` — synthesized cues (gong / great ding / good confirm / fail).
+- `src/audio/` — cue audio: embedded warn/good/great recordings + synthesized fail.
 - `src/render/` — dial, background-noise field, timing tape, palettes.
 - `src/analytics/` — stats math, persistent history, charts, insights.
 - `src/ui/` — controls, Program HUD, results, dashboard, guide.
@@ -49,3 +50,12 @@ Source: GitHub Actions in the repo settings).
 
 Storage: `localStorage` keys `dbdtrainer.settings.v1` and
 `dbdtrainer.history.v1` (schema-versioned, capped at 500 records).
+
+## Disclaimer
+
+Unofficial, non-commercial fan project — **not affiliated with Behaviour
+Interactive**. *Dead by Daylight* and its skill-check sounds are © Behaviour
+Interactive Inc.; the embedded cue recordings (`src/assets/*.mp3`) are used for
+non-commercial practice only and remain their owner's property (the `fail` cue
+is synthesized; all visuals are original). Rights holders may request removal
+via this repo's issues. Full text: [DISCLAIMER.md](../DISCLAIMER.md).

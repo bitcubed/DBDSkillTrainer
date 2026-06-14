@@ -13,15 +13,18 @@ port its math and feel; don't reinvent them). This spec assumes both are provide
 
 ## 0. Constraints (do not violate)
 
-- **No copyrighted assets.** No DBD audio, sprites, art, or fonts. All sounds stay
-  synthesized; all visuals stay original. (See prototype's audio + render code.)
+- **Audio (rule relaxed 2026-06-14 — see context §5).** The `warn`/`good`/`great` cues
+  are the owner's embedded recordings (`src/assets/*.mp3`, bundled by Vite); the `fail`
+  cue stays synthesized. The owner accepted the copyright caveat for the public deploy.
+  **All visuals stay original** — no sprites, screenshots, art, or fonts (Canvas-drawn).
 - **No framework lock-in for the game loop.** The dial/engine is plain TypeScript +
   Canvas. A framework is allowed *only* if you choose it for the dashboard (see §2); the
   engine must not depend on it.
 - **Static deploy.** The output must run as static files (no server runtime required).
-- **Preserve the verified-vs-approximated distinction.** Approximated values (warning
-  lead, Lullaby scaling, synthesized audio, BG visuals, unlimited storm) must remain
-  labeled in the UI exactly as the prototype labels them.
+- **Preserve the verified-vs-approximated distinction.** Approximated/adapted values
+  (warning lead, Lullaby scaling, BG visuals, unlimited storm) must remain labeled in the
+  UI, and the footer must state the audio posture honestly (embedded recordings for
+  warn/good/great, synthesized fail — see context §5).
 - **Don't re-add Healing or Wiggle.**
 
 ---
@@ -84,7 +87,7 @@ dbd-skillcheck-trainer/
 │  │  ├─ perks.ts              # HF / StakeOut / Unnerving / Lullaby / Toolbox / Storm modifiers
 │  │  └─ program.ts            # 5-min Program: segment defs + scheduler + per-segment stats
 │  ├─ audio/
-│  │  └─ synth.ts              # WebAudio synthesized gong / great / good / fail
+│  │  └─ synth.ts              # WebAudio: embedded warn/good/great recordings + synthesized fail
 │  ├─ render/
 │  │  ├─ dial.ts               # the dial (ring, zones, pointer)
 │  │  ├─ bgNoise.ts            # animated background field
@@ -221,8 +224,11 @@ cooldown`.
 - Storm: only valid on gen/doctor; **unlimited** (miss costs progress, never blocks/ends);
   starts gen at 90%; loops the gen on completion *during a Program* so checks keep coming.
 
-**Audio (`synth.ts`)**: synthesized metallic gong / bright ding / dull good / explosion
-fail (port from prototype). Respect volume; silent when Lullaby ≥ 5.
+**Audio (`synth.ts`)**: the `warn`/`good`/`great` cues play the owner's embedded
+recordings (`src/assets/*.mp3`, Vite-bundled); the `fail` cue stays synthesized (a
+distorted low blast + noise burst). Respect volume; warn is silent when Lullaby ≥ 5.
+(Rule relaxed 2026-06-14 — see context §5; the prototype uses HTMLAudioElement for the
+same three files.)
 
 **Render (`dial.ts`, `bgNoise.ts`, `tape.ts`)**: faithful dial (white ring, bright solid
 great band at the leading edge, lighter outlined good band, red needle + hub); animated
@@ -271,7 +277,7 @@ export const STORM_START_FRACTION = 0.9;
 export const APPROXIMATIONS = {
   warnLeadDefaultMs: 500,   // exact game value unpublished → slider
   lullabyScaling: 'linear', // per-token gong reduction; real values unpublished
-  audio: 'synthesized',     // not game audio (copyright)
+  audio: 'embedded',        // warn/good/great recordings; fail synthesized (§5 relaxation)
   bgNoise: 'original',      // invented for training
   stormTiming: 'unlimited', // trainer never blocks the gen (game blocks 16/18/20s)
   inputLatency: 'browser ≠ in-game pipeline',
@@ -417,8 +423,11 @@ Target: high coverage on `engine/`, `analytics/stats.ts`, `analytics/history.ts`
 6. `prefers-reduced-motion` respected; colorblind-safe mode keeps results distinguishable;
    keyboard-operable with visible focus.
 7. Verified-vs-approximated labeling preserved in the UI footer (warning lead, Lullaby
-   scaling, synthesized audio, BG visuals, unlimited storm, browser-latency caveat).
-8. No copyrighted assets anywhere in the repo.
+   scaling, audio posture [embedded warn/good/great recordings, synthesized fail], BG
+   visuals, unlimited storm, browser-latency caveat).
+8. No copyrighted **visual** assets anywhere; audio is the owner's embedded cue
+   recordings (warn/good/great) with a synthesized fail, per the context §5 relaxation —
+   the accepted copyright caveat for the public deploy.
 9. Tests in §9 pass; typecheck clean; lint clean.
 
 ---
