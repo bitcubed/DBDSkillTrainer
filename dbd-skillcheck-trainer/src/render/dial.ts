@@ -234,7 +234,11 @@ export function drawDial(
   // where the ring is off-screen except during a check.
   const LINGER_MS = 100;
   const lingering = state.pulse !== null && now - state.pulse.at < LINGER_MS;
-  if (!on && !lingering) return; // blank between checks
+  // Idle (not running): show a dimmed preview ring + center cue so the dial-size
+  // slider's effect is visible before you start. During a run, stay blank between
+  // checks (mirrors DBD, where the ring is off-screen except during a check).
+  const idlePreview = !state.running && !on && !lingering;
+  if (!on && !lingering && !idlePreview) return;
 
   const scale = state.dialScale ?? 1;
   const R = dialRadius(w, h, scale);
@@ -263,6 +267,7 @@ export function drawDial(
   }
 
   ctx.save();
+  if (idlePreview) ctx.globalAlpha = 0.5; // ghost the idle preview
 
   // Track: a thin, crisp hollow ring (the path the needle rides).
   ctx.strokeStyle = 'rgba(236,240,238,0.55)';
@@ -301,7 +306,7 @@ export function drawDial(
     const travel = (now - c.t0) * c.degPerMs;
     const th = c.dir * travel;
     const nIn = 8 * scale;
-    const nOut = R + 7 * scale;
+    const nOut = R + 16 * scale; // extend the needle clearly past the ring
     const hw = 1.3 * scale;
     // Trail ghosts draw without a shadow — shadowBlur is the costly part of the
     // per-frame needle render, and only the live needle below needs the glow.

@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.5 — 2026-06-14 — Longer needle, idle dial preview, faster BG noise
+
+### Changed
+- **Needle reaches further past the ring.** The red "blood streak" now extends
+  ~16px past the dial ring (was ~7), so it reads as a proper needle poking past
+  the circle.
+- **Idle dial preview.** When the trainer is stopped, a dimmed ring + center cue
+  is shown so the **Dial size** slider's effect is visible before you start.
+  During a run the dial still stays blank between checks (mirrors DBD).
+- **Background noise is faster and more game-like.** The "BG Noise" field is now
+  a denser, fast-drifting, flickering scatter with streaking warm sparks/embers
+  (over the slow atmospheric blobs) — closer to reading a check against the
+  in-game environment. Still toggled by the **BG Noise** chip and frozen to a
+  static field under `prefers-reduced-motion`.
+
 ## 0.2.4 — 2026-06-14 — Smoother animation, tighter input timing, roomier layout
 
 ### Changed
