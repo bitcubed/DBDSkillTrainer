@@ -25,6 +25,15 @@ Owner: Jonah (plays DBD; wants an accurate, research-grounded trainer he can dri
 
 ## 2. Current state (what already exists)
 
+**Update 2026-06-14 (later) — Hard Mode added.** New divided-attention "killer lookout"
+mode (and a "Lookout" Program segment): first-person 360° Canvas panorama you pan with the
+mouse / arrow keys while hitting checks, catching an approaching generic killer silhouette
+by centering your view on it. Pure killer/yaw state machine in `engine/hardMode.ts`
+(17 tests), original panorama in `render/scene.ts`, history schema v2 with optional killer
+metrics, a Hard-Mode settings panel, and a dashboard spotted-rate trend. Reduced-motion +
+colorblind-safe + fully keyboard-operable. See §5 for the locked decisions (centered dial,
+Space-to-hit, port-as-source-of-truth). Typecheck/lint clean, 136 tests, `vite build` clean.
+
 **Update 2026-06-14 — audio embedded; dial reworked to 1:1.** The owner provided
 three skill-check recordings (check-appears / good / great) and screenshots. After
 two synthesis passes did not satisfy, the owner chose to embed the recordings
@@ -177,6 +186,19 @@ practice distribution maps directly onto it:
   - **Browser input latency ≠ in-game input pipeline.** The tool builds the read,
     rhythm, and timing-bias awareness; exact timing should be calibrated in a DBD custom
     match. This caveat must stay visible in the UI.
+  - **Hard Mode (added 2026-06-14)** is an *invented* divided-attention drill (first-person
+    killer-lookout): pan a 360° original Canvas scene while hitting checks, and "catch" an
+    approaching generic killer silhouette before it reaches you. Everything about it is
+    approximated training knobs (not game data), labeled as such in the footer + a settings
+    panel. The killer is a **generic, IP-safe original silhouette** (no game characters).
+    Hard Mode uses **centered** gen checks (no Doctor off-centre) so the dial HUD sits at
+    screen center over the scene, and resolves checks with **Space** (the mouse is for
+    looking). It's a standalone mode AND a "Lookout" segment in the 5-min Program; history
+    schema bumped to **v2** for optional killer metrics (backward-compatible).
+- **The port (`dbd-skillcheck-trainer/src/`) is the source of truth (since 2026-06-14).**
+  The single-file `dbd-skillcheck-trainer.html` prototype is a **frozen legacy reference** —
+  not kept in sync with the port (it predates Hard Mode). Build features in the port; don't
+  assume prototype parity for anything after 2026-06-14.
 - **Healing and Wiggle were intentionally removed.** Don't re-add them without a reason.
 - Game numbers change with patches. The constants in §3 were correct as of the build; if
   work resumes much later, re-verify against the wiki before trusting them.

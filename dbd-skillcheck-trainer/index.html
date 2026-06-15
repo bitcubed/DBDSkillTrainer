@@ -15,6 +15,7 @@
     <div class="tab on" data-mode="gen" role="radio" tabindex="0" aria-checked="true">Generator</div>
     <div class="tab" data-mode="doctor" role="radio" tabindex="0" aria-checked="false">Doctor</div>
     <div class="tab" data-mode="special" role="radio" tabindex="0" aria-checked="false">Special</div>
+    <div class="tab" data-mode="hard" role="radio" tabindex="0" aria-checked="false">Hard Mode</div>
   </div>
 
   <div class="row specialrow" id="specialRow">
@@ -114,6 +115,29 @@
   <div class="chips display" id="displayChips">
     <div class="chip" id="cRM" tabindex="0" role="button" aria-pressed="false">Reduced Motion <span class="tok" id="rmTok">off</span></div>
     <div class="chip" id="cCB" tabindex="0" role="button" aria-pressed="false">Colorblind-safe <span class="tok" id="cbTok">off</span></div>
+  </div>
+
+  <div class="hardpanel" id="hardPanel">
+    <div class="hardpanel-h"><span class="cap">Hard Mode — Lookout</span><span class="hardpanel-note">all values are approximated training knobs, not game data</span></div>
+    <div class="sliders">
+      <div class="sl"><div class="lab"><span>Approach time</span><b id="vHardApproach">3.0 s</b></div>
+        <input type="range" id="rHardApproach" min="1500" max="6000" value="3000" step="100" aria-label="Killer approach time"></div>
+      <div class="sl"><div class="lab"><span>Catch cone</span><b id="vHardCone">15°</b></div>
+        <input type="range" id="rHardCone" min="6" max="35" value="15" aria-label="Catch cone"></div>
+      <div class="sl"><div class="lab"><span>Encounter — min</span><b id="vHardMin">8 s</b></div>
+        <input type="range" id="rHardMin" min="3" max="40" value="8" aria-label="Encounter min gap"></div>
+      <div class="sl"><div class="lab"><span>Encounter — max</span><b id="vHardMax">20 s</b></div>
+        <input type="range" id="rHardMax" min="4" max="60" value="20" aria-label="Encounter max gap"></div>
+      <div class="sl"><div class="lab"><span>Miss penalty</span><b id="vHardPenalty">5%</b></div>
+        <input type="range" id="rHardPenalty" min="0" max="25" value="5" aria-label="Miss penalty"></div>
+      <div class="sl"><div class="lab"><span>Pan sensitivity</span><b id="vHardPan">1.00×</b></div>
+        <input type="range" id="rHardPan" min="40" max="250" value="100" aria-label="Pan sensitivity"></div>
+      <div class="sl"><div class="lab"><span>Danger cue intensity</span><b id="vHardDanger">50%</b></div>
+        <input type="range" id="rHardDanger" min="0" max="100" value="50" aria-label="Danger cue intensity"></div>
+    </div>
+    <div class="hardpanel-row">
+      <button class="chip" id="hardDangerToggle" role="button" aria-pressed="true">Danger cue: on</button>
+    </div>
   </div>
 
   <div class="foot" id="footNote"></div>

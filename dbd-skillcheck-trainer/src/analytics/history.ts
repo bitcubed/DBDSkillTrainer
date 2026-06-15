@@ -13,7 +13,10 @@ export interface StorageLike {
 }
 
 export const HISTORY_KEY = 'dbdtrainer.history.v1';
-export const HISTORY_SCHEMA_VERSION = 1;
+// v2 (2026-06-14) adds optional Hard Mode killer metrics to overall/segments.
+// Additive + backward-compatible: v1 records simply lack those fields and still
+// load (isValidRecord doesn't gate on version; the new fields are optional).
+export const HISTORY_SCHEMA_VERSION = 2;
 export const HISTORY_CAP = 500;
 /** Free-play runs need at least this many checks to be logged (spec §8.1). */
 export const FREEPLAY_MIN_CHECKS = 10;
@@ -103,6 +106,12 @@ export function clearHistory(storage: StorageLike): void {
   }
 }
 
+export interface KillerSummary {
+  encounters: number;
+  spotted: number;
+  avgReactionMs: number | null;
+}
+
 export interface RunSummaryInput {
   kind: 'program' | 'freeplay';
   startedAt: number; // epoch ms
@@ -114,6 +123,7 @@ export interface RunSummaryInput {
   errsMs: readonly number[];
   segments?: SegmentResult[];
   settingsSnapshot: Partial<Settings>;
+  killer?: KillerSummary; // present when the run involved Hard Mode encounters
 }
 
 export function makeSessionRecord(i: RunSummaryInput): SessionRecord {
@@ -135,6 +145,12 @@ export function makeSessionRecord(i: RunSummaryInput): SessionRecord {
     settingsSnapshot: i.settingsSnapshot,
   };
   if (i.segments) record.segments = i.segments;
+  if (i.killer && i.killer.encounters > 0) {
+    record.overall.killerEncounters = i.killer.encounters;
+    record.overall.killerSpotted = i.killer.spotted;
+    record.overall.killerSpottedRate = i.killer.spotted / i.killer.encounters;
+    record.overall.avgReactionMs = i.killer.avgReactionMs;
+  }
   return record;
 }
 

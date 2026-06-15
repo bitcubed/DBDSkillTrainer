@@ -1,6 +1,6 @@
 // Shared types/enums for the engine. See CLAUDE_CODE_PROJECT_SPEC.md §4.
 
-export type Mode = 'gen' | 'doctor' | 'special';
+export type Mode = 'gen' | 'doctor' | 'special' | 'hard';
 export type SpecialId = 'ds' | 'oc1' | 'oc2' | 'oc3' | 'opp' | 'bnp' | 'snap';
 export type CheckId = 'gen' | SpecialId;
 export type Pacing = 'drill' | 'realistic';
@@ -60,6 +60,9 @@ export interface SegmentResult {
   hits: number;
   meanMs: number | null; // constant error
   sdMs: number | null; // variable error
+  // Hard Mode ("Lookout" segment) only — killer-spotting outcome:
+  killerEncounters?: number;
+  killerSpotted?: number;
 }
 
 export interface SessionRecord {
@@ -75,6 +78,11 @@ export interface SessionRecord {
     meanMs: number | null;
     sdMs: number | null;
     bestStreak: number; // best great streak at the time the run ended
+    // Hard Mode metrics (history schema v2+; absent on pre-v2 / non-hard runs):
+    killerEncounters?: number;
+    killerSpotted?: number;
+    killerSpottedRate?: number; // 0..1
+    avgReactionMs?: number | null;
   };
   segments?: SegmentResult[]; // present for kind==='program'
   settingsSnapshot: Partial<Settings>;
@@ -93,4 +101,13 @@ export interface Settings {
   lastSpecial: SpecialId;
   reducedMotion: boolean;
   colorblindSafe: boolean;
+  // Hard Mode tunables (all APPROXIMATED training knobs, not game values):
+  hardApproachMs: number;
+  hardCatchConeDeg: number;
+  hardEncounterMinS: number;
+  hardEncounterMaxS: number;
+  hardMissPenaltyPct: number;
+  hardPanSensitivity: number;
+  hardDangerCue: boolean;
+  hardDangerCueIntensity: number;
 }

@@ -24,6 +24,7 @@ export class Dashboard {
   private readonly latest: Record<string, HTMLElement> = {};
   private readonly pbs: HTMLElement;
   private readonly read: HTMLElement;
+  private readonly killerSection: HTMLElement;
 
   constructor(private readonly container: HTMLElement) {
     container.classList.add('dash');
@@ -44,6 +45,11 @@ export class Dashboard {
             <div class="dcard"><div class="dc-t"><span>±SD — variable error</span><span class="dc-v" data-v="sd"></span></div><canvas data-chart="sd" aria-hidden="true"></canvas></div>
             <div class="dcard"><div class="dc-t"><span>Avg bias — constant error</span><span class="dc-v" data-v="bias"></span></div><canvas data-chart="bias" aria-hidden="true"></canvas></div>
           </div>
+          <div class="dash-killer" data-killer style="display:none">
+            <div class="dash-grid">
+              <div class="dcard"><div class="dc-t"><span>Killer spotted rate — Hard Mode</span><span class="dc-v" data-v="spot"></span></div><canvas data-chart="spot" aria-hidden="true"></canvas></div>
+            </div>
+          </div>
           <div class="dash-h2">
             <span class="cap">Program segment trends</span>
             <select class="dash-seg" aria-label="Program segment">${PROGRAM.map((s, i) => `<option value="${i}">${esc(s.name)}</option>`).join('')}</select>
@@ -61,6 +67,7 @@ export class Dashboard {
     this.sections = container.querySelector('.dash-sections')!;
     this.pbs = container.querySelector('.dash-pbs')!;
     this.read = container.querySelector('.dash-read')!;
+    this.killerSection = container.querySelector('[data-killer]')!;
     for (const cv of container.querySelectorAll<HTMLCanvasElement>('canvas[data-chart]')) {
       this.charts[cv.dataset.chart!] = cv;
     }
@@ -131,6 +138,24 @@ export class Dashboard {
     this.latest.bias!.textContent =
       lastBias != null ? `${lastBias < 0 ? '−' : '+'}${Math.abs(lastBias).toFixed(0)}ms` : '–';
 
+    // Killer spotted-rate trend (only when Hard Mode runs exist). Violet, not
+    // red/green, so it reads in the colorblind-safe palette too.
+    const spotRates = filtered.map((r) =>
+      r.overall.killerSpottedRate != null ? r.overall.killerSpottedRate * 100 : null,
+    );
+    const hasKiller = spotRates.some((v) => v !== null);
+    this.killerSection.style.display = hasKiller ? 'block' : 'none';
+    if (hasKiller) {
+      drawLineChart(this.charts.spot!, {
+        series: [{ values: spotRates, color: '#c89bf0' }],
+        yFmt: (v) => `${v.toFixed(0)}%`,
+        yMinHint: 0,
+        yMaxHint: 100,
+      });
+      const lastSpot = [...spotRates].reverse().find((v) => v != null);
+      this.latest.spot!.textContent = lastSpot != null ? `${Math.round(lastSpot)}%` : '–';
+    }
+
     // Per-segment Program trends.
     const segName = PROGRAM[this.segIdx]?.name ?? '';
     const progs = this.records.filter((r) => r.kind === 'program' && r.segments);
@@ -161,13 +186,18 @@ export class Dashboard {
     const pb = personalBests(this.records, Date.now());
     const card = (v: string, k: string): string =>
       `<div class="pb"><div class="v">${v}</div><div class="k">${k}</div></div>`;
+    const killerRecs = this.records.filter((r) => r.overall.killerSpottedRate != null);
+    const bestSpot = killerRecs.length
+      ? Math.max(...killerRecs.map((r) => r.overall.killerSpottedRate!))
+      : null;
     this.pbs.innerHTML =
       card(pb.bestGreatRate ? `${Math.round(pb.bestGreatRate.value * 100)}%` : '–', 'Best great rate') +
       card(pb.lowestSd ? `±${pb.lowestSd.value.toFixed(0)}ms` : '–', 'Lowest ±SD') +
       card(pb.longestStreak ? String(pb.longestStreak.value) : '–', 'Longest streak') +
       card(String(pb.programsCompleted), 'Programs done') +
       card(String(pb.sessionCount), 'Sessions logged') +
-      card(pb.dayStreakDays > 0 ? `${pb.dayStreakDays}d` : '–', 'Day streak');
+      card(pb.dayStreakDays > 0 ? `${pb.dayStreakDays}d` : '–', 'Day streak') +
+      (bestSpot != null ? card(`${Math.round(bestSpot * 100)}%`, 'Best spotted rate') : '');
 
     // The readout describes the same records the charts above are showing.
     this.read.textContent = trendReadout(filtered);

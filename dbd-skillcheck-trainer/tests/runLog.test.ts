@@ -101,7 +101,7 @@ describe('RunLogger — free play', () => {
 });
 
 describe('RunLogger — programs', () => {
-  it('a completed Program logs one record with exactly 5 segments', () => {
+  it('a completed Program logs one record with exactly 6 segments', () => {
     const h = makeHarness();
     const s = memStorage();
     const log = new RunLogger(s);
@@ -123,8 +123,15 @@ describe('RunLogger — programs', () => {
     expect(records).toHaveLength(1);
     const r = records[0]!;
     expect(r.kind).toBe('program');
-    expect(r.segments).toHaveLength(5);
-    expect(r.segments!.map((x) => x.name)).toEqual(['Warm-up', 'Overload', 'Varied', 'Bias-fix', 'Pressure']);
+    expect(r.segments).toHaveLength(6);
+    expect(r.segments!.map((x) => x.name)).toEqual([
+      'Warm-up',
+      'Overload',
+      'Varied',
+      'Bias-fix',
+      'Lookout',
+      'Pressure',
+    ]);
     expect(r.durationS).toBeCloseTo(300, 0);
     expect(r.overall.miss).toBe(h.session.stats.miss); // all no-press misses captured
   });

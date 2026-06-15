@@ -498,3 +498,42 @@ differences (engine math is otherwise verbatim — see `CHANGELOG.md`):
     are dropped (never crash the dashboard); settings clamp per-field to the
     slider ranges with enum checks, so removed features can't resurface via
     storage.
+
+### 11.3 Hard Mode (added 2026-06-14)
+
+**Hard Mode** is an invented divided-attention / killer-lookout drill — a new
+`Mode` (`'hard'`) AND a 6th "Lookout" Program segment. It is additive; the base
+game engine math/feel is unchanged.
+
+- **Architecture.** Pure killer/yaw state machine + catch math in
+  `engine/hardMode.ts` (clock- and RNG-injected, fully unit-tested:
+  `tests/hardMode.test.ts`); original 2.5D Canvas panorama + generic killer in
+  `render/scene.ts`; mode wiring, input (mouse-pan + ◄►/A-D/Q-E turn + Space),
+  and the killer↔progress penalty in `main.ts`. No new dependencies; the engine
+  stays framework-free TS + Canvas.
+- **Killer state machine.** `idle → approaching → caught | reached`. Caught =
+  view-center within `catchConeDeg` of the killer for ≥ `catchDwellMs` (records
+  reaction time); reached = the `approachMs` window elapses uncaught (counts as a
+  miss + a `missPenaltyPct` gen-progress hit + a scare; the run continues).
+- **Tunables** (APPROXIMATED — labeled in the UI footer + a Hard-Mode settings
+  panel, persisted in `Settings`): approachMs (~3000), catchConeDeg (~15),
+  catchDwellMs (~180, fixed), fovDeg (~90, fixed), pan sensitivity, encounter
+  min/max gap (~8–20s), missPenaltyPct (~5), danger-cue on/off + intensity.
+- **Divergences (documented):**
+  - **Centered dial.** Hard Mode runs centered generator checks (Doctor
+    off-centre suppressed), so the dial HUD overlays the scene at screen center.
+  - **Space-to-hit.** The mouse is busy looking, so Space resolves checks
+    regardless of the Input setting; clicks do not resolve checks in this mode.
+- **Analytics.** History schema bumped to **v2** with optional killer metrics
+  (`killerEncounters`, `killerSpotted`, `killerSpottedRate`, `avgReactionMs` on
+  `overall`; `killerEncounters`/`killerSpotted` on the Lookout `SegmentResult`).
+  Additive + backward-compatible: v1 records lack the fields and still load. The
+  dashboard adds a Killer-spotted-rate trend + a "Best spotted rate" personal best
+  when Hard Mode runs exist.
+- **Accessibility.** Reduced motion cuts the scare shake/flash and steps the
+  approach; the killer reads by shape + bright outline (not red hue alone) and
+  uses the colorblind-safe danger color; the ◄►/A-D/Q-E turn keeps it fully
+  keyboard-operable. Base modes remain usable without a mouse.
+- **Source of truth.** The port (`src/`) is now authoritative; the single-file
+  `dbd-skillcheck-trainer.html` prototype is a frozen legacy reference and does
+  **not** include Hard Mode (see CLAUDE.md).

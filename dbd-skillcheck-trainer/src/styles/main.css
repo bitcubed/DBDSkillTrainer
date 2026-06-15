@@ -162,6 +162,14 @@ body.reduced .stage.shake{animation:none;}
 body.cb{ --fail:#4d9fd6; }
 .chips.display{margin-top:8px;}
 
+/* ---- Hard Mode settings panel ---- */
+.hardpanel{display:none; margin-top:12px; background:var(--panel); border:1px solid var(--line); border-radius:9px; padding:11px 14px 13px;}
+.hardpanel.show{display:block;}
+.hardpanel-h{display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap;}
+.hardpanel-note{font-size:10px; color:var(--dim); letter-spacing:.02em;}
+.hardpanel .sliders{margin-top:8px;}
+.hardpanel-row{margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;}
+
 /* ---- two-column layout: trainer + guide sidebar ---- */
 .layout{display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:30px; align-items:start;}
 @media (max-width:1040px){ .layout{grid-template-columns:1fr;} }

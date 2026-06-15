@@ -98,6 +98,17 @@ export const GUIDE_HTML = `
     </div>
 
     <div class="gsec">
+      <h4><span class="n">✦</span>Hard Mode — divided attention (killer lookout)</h4>
+      <p>The real test isn't hitting checks in a vacuum — it's hitting them <b>while watching for the killer</b>. Hard Mode puts you first-person at a generator: <b>move the mouse</b> (or <b>◄ ►</b> / Q-E) to pan your view around a 360° scene, hit checks with <b>Space</b>, and <b>catch the killer</b> by centering your view on it before it reaches you (~3s).</p>
+      <ul>
+        <li>Trains <b>scanning</b> instead of tunnel-visioning the dial — the skill that actually keeps you alive.</li>
+        <li>Spotting is scored as a <b>spotted rate</b>; getting caught costs a little gen progress (a scare) but the run continues.</li>
+        <li>Everything is tunable below the dial when Hard Mode is selected (approach time, catch cone, encounter frequency, miss penalty, pan feel, danger cue).</li>
+      </ul>
+      <p class="gnote">Invented drill — the numbers are training knobs, not game values. The killer is a generic original silhouette, and the dial stays centered in this mode.</p>
+    </div>
+
+    <div class="gsec">
       <h4><span class="n">!</span>One honest limit</h4>
       <p>Lab CAT studies note training often transfers to the trained task but <b>not perfectly to a different environment</b>. This trainer sharpens the read, the rhythm, and your timing-bias awareness — but browser input latency isn't your in-game pipeline. Use it to build the skill, then <b>calibrate exact timing in a DBD custom match</b>.</p>
     </div>
@@ -111,5 +122,5 @@ export const GUIDE_HTML = `
 
 export const FOOT_NOTE_HTML =
   '<b>Verified vs. game data:</b> zone sizes, pointer rotation times, zone spawn positions (4–11 o’clock; DS 8–11), the +1% gen great bonus, fail penalties, per-second trigger odds, 3s fail pause (Snap Out of It: 2s), Hyperfocus (+4% speed &amp; odds, +30% bonus per token), Unnerving (good zone only, −40/50/60%), Stake Out, Madness off-centre/reversed rolls, Merciless Storm continuous chaining. ' +
-  '<b>Approximated / adapted:</b> warning-gong lead time (slider), Lullaby per-token scaling, audio (the check/good/great cues are recorded skill-check sounds; the fail cue is synthesized), background-noise visuals. Storm here runs <b>unlimited</b> — a miss costs progress but never blocks. Browser input latency differs from your in-game pipeline — train the read and rhythm here, calibrate exact timing in customs. ' +
+  '<b>Approximated / adapted:</b> warning-gong lead time (slider), Lullaby per-token scaling, audio (the check/good/great cues are recorded skill-check sounds; the fail cue is synthesized), background-noise visuals. Storm here runs <b>unlimited</b> — a miss costs progress but never blocks. <b>Hard Mode</b> (killer-lookout) is an invented divided-attention drill — its tunables (approach time, catch cone, encounter frequency, miss penalty, danger cue) are training knobs, not game values; the killer is a generic original silhouette and the dial stays centered in this mode. Browser input latency differs from your in-game pipeline — train the read and rhythm here, calibrate exact timing in customs. ' +
   '<b>Not affiliated with Behaviour Interactive.</b> “Dead by Daylight” and its skill-check sounds are © Behaviour Interactive Inc.; the embedded cue recordings remain their owner’s property and are used here only for non-commercial, fan-made practice. Rights holders may request removal via this project’s GitHub issues.';

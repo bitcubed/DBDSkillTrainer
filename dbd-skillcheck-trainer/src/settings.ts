@@ -20,6 +20,15 @@ export const DEFAULT_SETTINGS: Settings = {
   lastSpecial: 'ds',
   reducedMotion: false,
   colorblindSafe: false,
+  // Hard Mode tunables (APPROXIMATED — see HARD_DEFAULTS).
+  hardApproachMs: 3000,
+  hardCatchConeDeg: 15,
+  hardEncounterMinS: 8,
+  hardEncounterMaxS: 20,
+  hardMissPenaltyPct: 5,
+  hardPanSensitivity: 1,
+  hardDangerCue: true,
+  hardDangerCueIntensity: 0.5,
 };
 
 function num(v: unknown, min: number, max: number, dflt: number): number {
@@ -36,7 +45,7 @@ function oneOf<T extends string>(v: unknown, allowed: readonly T[], dflt: T): T 
 
 const INPUT_MODES: readonly InputMode[] = ['both', 'mouse', 'space'];
 const PACINGS: readonly Pacing[] = ['drill', 'realistic'];
-const MODES: readonly Mode[] = ['gen', 'doctor', 'special'];
+const MODES: readonly Mode[] = ['gen', 'doctor', 'special', 'hard'];
 const SPECIALS: readonly SpecialId[] = ['ds', 'oc1', 'oc2', 'oc3', 'opp', 'bnp', 'snap'];
 
 /** Load + validate settings; anything missing/corrupt falls back per-field to defaults. */
@@ -65,6 +74,15 @@ export function loadSettings(storage: StorageLike): Settings {
     lastSpecial: oneOf(o.lastSpecial, SPECIALS, d.lastSpecial),
     reducedMotion: bool(o.reducedMotion, d.reducedMotion),
     colorblindSafe: bool(o.colorblindSafe, d.colorblindSafe),
+    // Hard Mode slider ranges from index.html (all approximated training knobs).
+    hardApproachMs: num(o.hardApproachMs, 1500, 6000, d.hardApproachMs),
+    hardCatchConeDeg: num(o.hardCatchConeDeg, 6, 35, d.hardCatchConeDeg),
+    hardEncounterMinS: num(o.hardEncounterMinS, 3, 40, d.hardEncounterMinS),
+    hardEncounterMaxS: num(o.hardEncounterMaxS, 4, 60, d.hardEncounterMaxS),
+    hardMissPenaltyPct: num(o.hardMissPenaltyPct, 0, 25, d.hardMissPenaltyPct),
+    hardPanSensitivity: num(o.hardPanSensitivity, 0.4, 2.5, d.hardPanSensitivity),
+    hardDangerCue: bool(o.hardDangerCue, d.hardDangerCue),
+    hardDangerCueIntensity: num(o.hardDangerCueIntensity, 0, 1, d.hardDangerCueIntensity),
   };
 }
 

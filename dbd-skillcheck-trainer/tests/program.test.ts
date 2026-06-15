@@ -44,17 +44,19 @@ function run(h: ProgHarness, from: number, to: number, stepMs = 50): number {
 }
 
 describe('program structure', () => {
-  it('has 5 segments totalling 300s', () => {
-    expect(PROGRAM).toHaveLength(5);
+  it('has 6 segments totalling 300s (incl. the Lookout hard-mode segment)', () => {
+    expect(PROGRAM).toHaveLength(6);
     expect(PROGRAM_TOTAL_S).toBe(300);
     expect(PROGRAM.map((s) => s.name)).toEqual([
       'Warm-up',
       'Overload',
       'Varied',
       'Bias-fix',
+      'Lookout',
       'Pressure',
     ]);
-    expect(PROGRAM.map((s) => s.durS)).toEqual([45, 75, 75, 45, 60]);
+    expect(PROGRAM.map((s) => s.durS)).toEqual([45, 60, 60, 30, 45, 60]);
+    expect(PROGRAM.find((s) => s.name === 'Lookout')?.kind).toBe('hard');
     expect(VARIED_SWITCH_MS).toBe(7000); // ~7s rotation cadence is part of the design
   });
 });
@@ -86,16 +88,23 @@ describe('segment application', () => {
     expect(h.session.zoneMul).toBe(1.0);
     expect(h.session.warnLeadMs).toBe(500);
 
-    // Bias-fix: back to gen 1.0× / 1.0× / 500ms.
-    run(h, t0 + 120_050, t0 + 195_050);
+    // Bias-fix (165–195s): back to gen 1.0× / 1.0× / 500ms.
+    run(h, t0 + 120_050, t0 + 180_000);
     expect(h.program.currentSegment()?.name).toBe('Bias-fix');
     expect(h.session.speedMul).toBe(1.0);
     expect(h.session.zoneMul).toBe(1.0);
     expect(h.session.warnLeadMs).toBe(500);
     expect(h.session.mode).toBe('gen');
 
-    // Pressure: storm on a gen dial starting at 90%, 1.0× zone, 120ms warn.
-    run(h, t0 + 195_050, t0 + 240_050);
+    // Lookout (195–240s): Hard Mode — gen dial, mode 'hard', no storm.
+    run(h, t0 + 180_000, t0 + 215_000);
+    expect(h.program.currentSegment()?.name).toBe('Lookout');
+    expect(h.session.mode).toBe('hard');
+    expect(h.session.storm).toBe(false);
+    expect(h.session.warnLeadMs).toBe(500);
+
+    // Pressure (240–300s): storm on a gen dial starting at 90%, 1.0× zone, 120ms warn.
+    run(h, t0 + 215_000, t0 + 270_000);
     expect(h.program.currentSegment()?.name).toBe('Pressure');
     expect(h.session.stormOn()).toBe(true);
     expect(h.session.warnLeadMs).toBe(120);
@@ -120,17 +129,24 @@ describe('segment application', () => {
   });
 });
 
-describe('regression: exactly 5 segment results, finalized once each', () => {
-  it('a full 300s run records exactly 5 segment results in order', () => {
+describe('regression: exactly 6 segment results, finalized once each', () => {
+  it('a full 300s run records exactly 6 segment results in order', () => {
     const h = makeProgram();
     const t0 = 1000;
     h.program.start(t0);
     run(h, t0, t0 + 301_000);
     expect(h.completed).toHaveLength(1);
     const segs = h.completed[0]!;
-    expect(segs).toHaveLength(5); // NOT 6 — the last segment must not double-finalize
-    expect(segs.map((s) => s.name)).toEqual(['Warm-up', 'Overload', 'Varied', 'Bias-fix', 'Pressure']);
-    expect(h.program.segStats).toHaveLength(5);
+    expect(segs).toHaveLength(6); // NOT 7 — the last segment must not double-finalize
+    expect(segs.map((s) => s.name)).toEqual([
+      'Warm-up',
+      'Overload',
+      'Varied',
+      'Bias-fix',
+      'Lookout',
+      'Pressure',
+    ]);
+    expect(h.program.segStats).toHaveLength(6);
     // Program cleaned up after itself.
     expect(h.program.active).toBe(false);
     expect(h.session.running).toBe(false);
@@ -180,17 +196,18 @@ describe('Varied rotation', () => {
     const h = makeProgram();
     const t0 = 1000;
     h.program.start(t0);
-    run(h, t0, t0 + 120_050); // into Varied
+    run(h, t0, t0 + 105_200); // just into Varied (105–165s), before the first rotation
     expect(h.program.currentSegment()?.name).toBe('Varied');
     expect(h.session.mode).toBe('gen');
     expect(h.program.currentRot().label).toBe('Generator');
+    const entryRotAt = h.program.rotAt; // when the Generator (entry) rotation started
 
     // Walk the segment, recording the SESSION state each rotation lands on and
     // the times at which rotations fire.
     const seen = new Map<string, { mode: string; special: string; speed: number }>();
     const rotTimes: number[] = [];
     let lastRot = h.program.rotIdx;
-    let now = t0 + 120_050;
+    let now = t0 + 105_200;
     for (let i = 0; i < 1000 && rotTimes.length < 3; i++) {
       now += 50;
       h.program.tick(now);
@@ -213,7 +230,7 @@ describe('Varied rotation', () => {
     // Cadence: each rotation fires ≥7s after the last, plus at most an
     // in-flight check (the rotation must wait for the active phase to clear).
     expect(rotTimes.length).toBe(3);
-    let prev = t0 + 120_050; // ≈ segment entry, when the first rotation's clock starts
+    let prev = entryRotAt; // the entry rotation's clock; each rotation is ~7s after the last
     for (const t of rotTimes) {
       const gap = t - prev;
       expect(gap).toBeGreaterThanOrEqual(VARIED_SWITCH_MS - 100);
@@ -226,9 +243,9 @@ describe('Varied rotation', () => {
     const h = makeProgram();
     const t0 = 1000;
     h.program.start(t0);
-    run(h, t0, t0 + 120_050); // into Varied
+    run(h, t0, t0 + 105_200); // just into Varied
     // Walk until a check is active, then force the rotation window to elapse.
-    let now = t0 + 120_050;
+    let now = t0 + 105_200;
     while (h.session.phase !== 'active') {
       now += 25;
       h.program.tick(now);
@@ -251,6 +268,41 @@ describe('Varied rotation', () => {
       h.session.tick(after);
     }
     expect(h.program.rotIdx).toBe(rotBefore + 1);
+  });
+});
+
+describe('Lookout (hard) segment killer metrics', () => {
+  it('records per-segment killer encounters/spotted via the readKiller hook', () => {
+    const h = makeHarness() as ProgHarness;
+    h.completed = [];
+    // A readKiller that only accrues encounters/spots DURING the Lookout window
+    // (195–240s), so the diff must land on the Lookout segment alone.
+    let spotted = 0;
+    let encounters = 0;
+    const program = new ProgramController(
+      h.session,
+      { onComplete: (segs) => h.completed.push(segs) },
+      () => ({ spotted, encounters }),
+    );
+    const t0 = 1000;
+    program.start(t0);
+    for (let now = t0; now <= t0 + 301_000; now += 50) {
+      // Simulate killer activity only inside the Lookout segment.
+      if (now - t0 > 195_000 && now - t0 < 240_000 && (now - t0) % 5000 === 0) {
+        encounters += 1;
+        if (encounters % 2 === 0) spotted += 1;
+      }
+      program.tick(now);
+      h.session.tick(now);
+    }
+    const segs = h.completed[0]!;
+    const lookout = segs.find((s) => s.name === 'Lookout')!;
+    expect(lookout.killerEncounters).toBeGreaterThan(0);
+    expect(lookout.killerSpotted).toBeGreaterThanOrEqual(0);
+    expect(lookout.killerEncounters).toBe(encounters);
+    expect(lookout.killerSpotted).toBe(spotted);
+    // Non-hard segments carry no killer fields.
+    expect(segs.find((s) => s.name === 'Warm-up')!.killerEncounters).toBeUndefined();
   });
 });
 

@@ -57,4 +57,24 @@ export const APPROXIMATIONS = {
   bgNoise: 'original', // invented for training
   stormTiming: 'unlimited', // trainer never blocks the gen (game blocks 16/18/20s)
   inputLatency: 'browser ≠ in-game pipeline',
+  hardMode: 'invented divided-attention drill; tunables below are not game values',
+} as const;
+
+// --- Hard Mode (divided-attention / killer-lookout) — APPROXIMATED defaults.
+// None of these are official game values; they are training knobs (see the UI
+// labels). The killer is a generic, original silhouette (no game characters).
+export const HARD_DEFAULTS = {
+  approachMs: 3000, // time from spawn to "reached" if uncaught
+  catchConeDeg: 15, // angular tolerance from view-center to count as "looking at it"
+  catchDwellMs: 180, // must hold it centered this long to catch
+  fovDeg: 90, // visible horizontal slice of the 360° scene
+  panSensitivity: 1, // user multiplier on edge pan speed
+  panMaxDegPerSec: 160, // yaw speed when the mouse is at the screen edge
+  panDeadzone: 0.12, // central fraction of the width with no pan
+  keyTurnDegPerSec: 110, // arrow / Q-E turn speed (keyboard fallback)
+  encounterMinMs: 8000, // randomized gap between encounters
+  encounterMaxMs: 20000,
+  missPenaltyPct: 5, // gen progress lost when the killer reaches you
+  dangerCue: true, // faint screen-edge tint on the killer's side
+  dangerCueIntensity: 0.5, // 0..1
 } as const;

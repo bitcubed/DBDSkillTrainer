@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.3.0 — 2026-06-14 — Hard Mode (divided-attention / killer lookout)
+
+### Added
+- **Hard Mode** — a new selectable mode AND a "Lookout" Program segment. You're
+  first-person at a generator: pan a 360° stylized 2.5D Canvas scene with the
+  mouse (or ◄ ► / Q-E) while hitting checks with **Space**, and "catch" an
+  approaching generic killer silhouette by centering your view on it within ~3s.
+  Missing it = a scare + a small gen-progress penalty; the run continues.
+- **Engine** `engine/hardMode.ts`: pure, unit-tested yaw/FOV mapping, catch-cone +
+  dwell detection, spawn → approach → catch/timeout state machine, and spotted-
+  rate / reaction-time scoring (clock- and RNG-injected). 17 new tests.
+- **Render** `render/scene.ts`: original procedural parallax silhouette panorama
+  (far treeline / mid rocks / near foreground), a generic abstract killer (danger
+  color + bright outline + distinct shape — colorblind-safe), a center reticle,
+  and an optional peripheral danger-edge cue.
+- **Program**: a 6th **Lookout** segment (the Program is still 300s; durations
+  rebalanced). The per-segment breakdown and history record killer spotted-rate.
+- **Analytics**: history schema **v2** adds optional killer metrics (encounters,
+  spotted, spotted-rate, avg reaction) — additive and backward-compatible with v1
+  records. The dashboard shows a Killer-spotted-rate trend + a "Best spotted rate"
+  personal best when Hard Mode runs exist.
+- **Tunables** (all approximated, in a Hard-Mode settings panel + persisted):
+  approach time, catch cone, encounter min/max gap, miss penalty, pan
+  sensitivity, danger-cue on/off + intensity.
+
+### Accessibility
+- Reduced motion disables the scare shake + flash and steps the killer's approach;
+  the killer reads by **shape + outline** (not red hue alone) and uses the
+  colorblind-safe danger color. Full keyboard operability via ◄ ► / A-D / Q-E turn
+  + Space; the base modes stay fully usable without a mouse. Hard Mode is opt-in.
+
+### Divergences (documented in spec §11.3)
+- Hard Mode uses **centered** generator checks (no Doctor off-centre), so the dial
+  HUD stays at screen center over the scene.
+- Hard Mode resolves checks with **Space** (the mouse is busy looking); clicks
+  don't resolve checks in this mode.
+- The **port (`src/`) is now the source of truth**; the single-file prototype
+  (`../dbd-skillcheck-trainer.html`) is a frozen legacy reference and does **not**
+  include Hard Mode.
+
+
 ## 0.2.5 — 2026-06-14 — Longer needle, idle dial preview, faster BG noise
 
 ### Changed

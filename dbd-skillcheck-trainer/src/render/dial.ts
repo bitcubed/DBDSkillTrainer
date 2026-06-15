@@ -217,6 +217,8 @@ export interface DialState {
   dialScale?: number;
   /** Which input cue to show in the dial center. Default 'space'. */
   inputMode?: InputMode;
+  /** Skip the canvas clear so the dial overlays an already-drawn scene (Hard Mode). */
+  skipClear?: boolean;
 }
 
 export function drawDial(
@@ -226,7 +228,7 @@ export function drawDial(
   now: number,
   state: DialState,
 ): void {
-  ctx.clearRect(0, 0, w, h);
+  if (!state.skipClear) ctx.clearRect(0, 0, w, h);
   const c = state.check;
   const on = state.active && c !== null;
   // The dial only exists while a check is happening, then lingers ~100 ms after

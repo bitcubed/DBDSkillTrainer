@@ -125,7 +125,9 @@ export class Session {
     return this.mode === 'special' ? TYPES[this.special] : TYPES.gen;
   }
   isRepair(): boolean {
-    return this.mode === 'gen' || this.mode === 'doctor';
+    // Hard Mode repairs the generator dial too (gen checks + progress), with the
+    // killer-lookout overlay layered on by the render/main loop.
+    return this.mode === 'gen' || this.mode === 'doctor' || this.mode === 'hard';
   }
   perksApply(): boolean {
     return this.isRepair();

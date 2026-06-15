@@ -1,16 +1,18 @@
 // Bootstrap: build UI, wire engine ↔ DOM ↔ persistence, start the RAF loop.
 
 import './styles/main.css';
-import { loadHistory, type StorageLike } from './analytics/history';
+import { loadHistory, type KillerSummary, type StorageLike } from './analytics/history';
 import { RunLogger } from './analytics/runLog';
 import { Synth } from './audio/synth';
 import { GEN_CHARGES } from './engine/constants';
+import { defaultHardConfig, HardMode, type HardConfig } from './engine/hardMode';
 import { ProgramController } from './engine/program';
 import { Session, type ResolveEvent } from './engine/session';
 import type { InputMode, Mode, Result, Settings } from './engine/types';
 import { BgNoise } from './render/bgNoise';
 import { drawDial, PULSE_MS, type ResolvePulse } from './render/dial';
 import { CB_PALETTE, DEFAULT_PALETTE, type ResultPalette } from './render/palette';
+import { Scene } from './render/scene';
 import { drawTape, tapeDomain, tapeReadout } from './render/tape';
 import { loadSettings, saveSettings } from './settings';
 import {
@@ -146,17 +148,76 @@ const session = new Session(
 const hud = new ProgramHud({ hud: $('progHud'), seg: $('phSeg'), trains: $('phTrains'), clock: $('phClock'), fill: $('phFill') });
 const dashboard = new Dashboard($('dashboard'));
 
-const program = new ProgramController(session, {
+// ---------------- Hard Mode (divided-attention / killer-lookout) ----------------
+const scene = new Scene();
+scene.init();
+
+function buildHardConfig(): HardConfig {
+  return {
+    ...defaultHardConfig(),
+    approachMs: settings.hardApproachMs,
+    catchConeDeg: settings.hardCatchConeDeg,
+    encounterMinMs: settings.hardEncounterMinS * 1000,
+    encounterMaxMs: settings.hardEncounterMaxS * 1000,
+    missPenaltyPct: settings.hardMissPenaltyPct,
+    panSensitivity: settings.hardPanSensitivity,
+    dangerCue: settings.hardDangerCue,
+    dangerCueIntensity: settings.hardDangerCueIntensity,
+  };
+}
+
+const hardMode = new HardMode(buildHardConfig(), Math.random, {
+  onReached: (now) => onKillerReached(now),
+  onSpotted: (reactionMs, now) => onKillerSpotted(reactionMs, now),
+});
+
+const hardModeActive = (): boolean => session.mode === 'hard';
+
+function killerSummary(): KillerSummary | undefined {
+  const encounters = hardMode.encounters();
+  return encounters > 0
+    ? { encounters, spotted: hardMode.spotted, avgReactionMs: hardMode.avgReactionMs() }
+    : undefined;
+}
+
+/** The killer reached you: scare + a gen-progress penalty (the run continues). */
+function onKillerReached(now: number): void {
+  const pen = (hardMode.cfg.missPenaltyPct / 100) * GEN_CHARGES;
+  session.charges = Math.max(0, session.charges - pen);
+  flash('KILLER!', 'var(--fail)', null, `caught you — −${hardMode.cfg.missPenaltyPct.toFixed(0)}%`);
+  ui.flashUntil = now + 1100;
+  synth.fail();
+  if (!reducedMotionOn()) {
+    stage.classList.remove('shake');
+    void (stage as HTMLElement).offsetWidth;
+    stage.classList.add('shake');
+  }
+  drawProgress();
+}
+
+/** You caught the killer in time — confirm with the reaction time. */
+function onKillerSpotted(reactionMs: number, now: number): void {
+  flash('SPOTTED', 'var(--gold)', null, `${(reactionMs / 1000).toFixed(2)}s`);
+  ui.flashUntil = now + 850;
+}
+
+const program = new ProgramController(
+  session,
+  {
   setBgNoise: (on) => {
     bgNoise.enabled = on;
     els.chips.bg.classList.toggle('on', on);
     els.toks.bg.textContent = on ? 'on' : 'off';
   },
-  onSegment: (seg) => {
+  onSegment: (seg, _idx, now) => {
     // Sync the mode tabs + sliders visually with what the Program just applied.
     setTabSelection(els.tabs, session.mode);
     els.specialRow.classList.toggle('show', session.mode === 'special');
     reflectSliders(els, seg.speed, seg.zone, seg.warnMs);
+    // The Lookout segment runs Hard Mode; every other segment stops it.
+    if (session.mode === 'hard') hardMode.start(now);
+    else hardMode.stop();
+    updateHint();
     refreshChips(els, session);
     drawProgress();
   },
@@ -168,6 +229,7 @@ const program = new ProgramController(session, {
   },
   onComplete: (segs, now) => {
     hud.hide();
+    hardMode.stop();
     flash('PROGRAM COMPLETE', 'var(--ok)', null, 'see your breakdown below');
     ui.flashUntil = now + 2600;
     setProgramLock(els, false);
@@ -176,7 +238,7 @@ const program = new ProgramController(session, {
     renderResults($('progResults'), segs, session.stats);
     refreshChips(els, session);
     drawProgress();
-    // Log the Program to history (spec §8.1: every run, with segments).
+    // Log the Program to history (spec §8.1: every run, with segments + killer metrics).
     if (ui.progStart) {
       const records = runLog.logProgram(
         session.stats,
@@ -184,6 +246,7 @@ const program = new ProgramController(session, {
         ui.progStart.epoch,
         (now - ui.progStart.perf) / 1000,
         ui.progStart.settingsSnapshot,
+        killerSummary(),
       );
       dashboard.setRecords(records);
       ui.progStart = null;
@@ -195,6 +258,7 @@ const program = new ProgramController(session, {
   },
   onCancel: (now) => {
     hud.hide();
+    hardMode.stop();
     flash('PROGRAM STOPPED', 'var(--mut)', null, '');
     ui.flashUntil = now + 1400;
     ui.progStart = null; // cancelled programs are not logged
@@ -205,7 +269,9 @@ const program = new ProgramController(session, {
     refreshChips(els, session);
     drawProgress();
   },
-});
+  },
+  () => ({ spotted: hardMode.spotted, encounters: hardMode.encounters() }),
+);
 
 /**
  * Re-apply the user's persisted settings to the live session/UI after a
@@ -221,9 +287,9 @@ function restoreUserSettings(): void {
   session.mode = settings.lastMode;
   session.special = settings.lastSpecial;
   setTabSelection(els.tabs, session.mode);
-  els.specialRow.classList.toggle('show', session.mode === 'special');
   els.specialSel.value = settings.lastSpecial;
-  els.pacingSel.disabled = !session.isRepair();
+  syncModeUI();
+  hardMode.cfg = buildHardConfig();
   bgNoise.enabled = settings.bgNoise;
   els.chips.bg.classList.toggle('on', settings.bgNoise);
   els.toks.bg.textContent = settings.bgNoise ? 'on' : 'off';
@@ -251,7 +317,7 @@ function beginFreeplayRun(now: number): void {
 
 /** Close out a free-play run; logs it when it had ≥10 checks (spec §8.1). */
 function endFreeplayRun(now: number): void {
-  const records = runLog.endFreeplay(session.stats, session.errCountTotal, now);
+  const records = runLog.endFreeplay(session.stats, session.errCountTotal, now, killerSummary());
   if (records) dashboard.setRecords(records);
 }
 
@@ -369,17 +435,26 @@ function drawTapeNow(): void {
 }
 
 // ---------------- main loop ----------------
-let lastBg = 0;
+let lastFrame = 0;
 function frame(now: number): void {
-  const bgdt = lastBg ? Math.min(0.05, (now - lastBg) / 1000) : 0;
-  lastBg = now;
-  bgNoise.draw(bgx, bgdt);
+  const dt = lastFrame ? Math.min(0.05, (now - lastFrame) / 1000) : 0;
+  lastFrame = now;
 
   if (program.active) {
     program.tick(now);
     hud.update(program, now);
   }
   session.tick(now);
+  const inHard = hardModeActive() && session.running;
+  if (inHard) hardMode.tick(now, dt);
+
+  // Background: Hard Mode's scene IS the backdrop, so hide the noise field there.
+  if (inHard) {
+    bgx.clearRect(0, 0, W, H);
+    bgCv.style.display = 'none';
+  } else {
+    bgNoise.draw(bgx, dt);
+  }
 
   if (ui.flashUntil && now > ui.flashUntil) {
     $('flash').classList.remove('show');
@@ -392,7 +467,7 @@ function frame(now: number): void {
     ui.chipAt = now + 250;
   }
 
-  drawDial(ctx, W, H, now, {
+  const dialState = {
     running: session.running,
     active: session.phase === 'active',
     check: session.check,
@@ -401,7 +476,25 @@ function frame(now: number): void {
     palette: pal,
     dialScale: session.dialScale,
     inputMode: ui.input,
-  });
+  };
+  if (inHard) {
+    // Scene first (clears the canvas), then the centered dial HUD overlays it.
+    scene.draw(ctx, W, H, {
+      yaw: hardMode.yaw,
+      fovDeg: hardMode.cfg.fovDeg,
+      killerActive: hardMode.killerActive(),
+      killerYaw: hardMode.killerYaw(),
+      killerProgress: hardMode.killerProgress(now),
+      killerDwellFrac: hardMode.killerDwellFrac(),
+      dangerCue: hardMode.cfg.dangerCue,
+      dangerIntensity: hardMode.cfg.dangerCueIntensity,
+      palette: pal,
+      reducedMotion: reducedMotionOn(),
+    });
+    drawDial(ctx, W, H, now, { ...dialState, skipClear: true });
+  } else {
+    drawDial(ctx, W, H, now, dialState);
+  }
 }
 // Render on the RAF presentation timestamp (not a fresh performance.now()): one
 // consistent clock per frame, aligned to when the frame is actually shown.
@@ -416,21 +509,71 @@ function press(now: number): void {
   synth.ensure();
   session.press(now);
 }
+
+// Hard Mode keyboard look-turn fallback (project rule: fully keyboard-operable).
+const TURN_LEFT = new Set(['ArrowLeft', 'KeyA', 'KeyQ']);
+const TURN_RIGHT = new Set(['ArrowRight', 'KeyD', 'KeyE']);
+let turnL = false;
+let turnR = false;
+function syncKeyTurn(): void {
+  hardMode.setKeyTurn((turnR ? 1 : 0) - (turnL ? 1 : 0));
+}
+
 window.addEventListener('keydown', (e) => {
-  // Only claim Space while a session is live — while idle, native Space
-  // behavior (activating focused buttons, opening selects) stays intact.
-  if (e.code === 'Space' && ui.input !== 'mouse' && session.running) {
+  // Space resolves checks. In Hard Mode the mouse is busy looking, so Space works
+  // regardless of the Input setting; otherwise honor it (idle Space stays native).
+  if (e.code === 'Space' && (ui.input !== 'mouse' || hardModeActive()) && session.running) {
     e.preventDefault();
     // Judge at the event's own timestamp (when the key actually went down), not
     // after handler dispatch — tighter for the ~33 ms great window.
     if (!e.repeat) press(e.timeStamp || performance.now());
+    return;
+  }
+  // Hard Mode look-turn (arrow / A-D / Q-E).
+  if (hardModeActive() && session.running) {
+    if (TURN_LEFT.has(e.code)) {
+      turnL = true;
+      syncKeyTurn();
+      e.preventDefault();
+    } else if (TURN_RIGHT.has(e.code)) {
+      turnR = true;
+      syncKeyTurn();
+      e.preventDefault();
+    }
   }
 });
+window.addEventListener('keyup', (e) => {
+  if (TURN_LEFT.has(e.code)) {
+    turnL = false;
+    syncKeyTurn();
+  } else if (TURN_RIGHT.has(e.code)) {
+    turnR = false;
+    syncKeyTurn();
+  }
+});
+// Losing focus mid-pan can swallow the keyup — clear held turn keys so the view
+// doesn't keep spinning when the tab regains focus.
+window.addEventListener('blur', () => {
+  if (turnL || turnR) {
+    turnL = false;
+    turnR = false;
+    syncKeyTurn();
+  }
+});
+// Mouse-look in Hard Mode: horizontal position over the stage pans the view (no
+// pointer lock); a central deadzone, faster toward the edges.
+stage.addEventListener('pointermove', (e) => {
+  if (!hardModeActive() || !session.running) return;
+  const r = stage.getBoundingClientRect();
+  hardMode.setMousePan(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)));
+});
+stage.addEventListener('pointerleave', () => {
+  if (hardModeActive()) hardMode.setMousePan(0.5); // recenter → stop panning
+});
 // Left click (or tap) anywhere counts as a press — matches an M1 skill-check
-// bind, so your cursor doesn't have to sit on the stage. Controls are excluded
-// so the UI still works mid-session; while not running, the page behaves normally.
+// bind. Excluded in Hard Mode (the mouse is for looking) and over controls.
 document.addEventListener('pointerdown', (e) => {
-  if (ui.input === 'space' || e.button !== 0 || !session.running) return;
+  if (hardModeActive() || ui.input === 'space' || e.button !== 0 || !session.running) return;
   if ((e.target as Element).closest('button,select,input,a,.chip,.tab')) return;
   e.preventDefault();
   press(e.timeStamp || performance.now());
@@ -454,10 +597,13 @@ function startStop(): void {
   if (session.running) {
     endFreeplayRun(now);
     session.stop();
+    hardMode.stop();
     setStartBtn();
     return;
   }
   session.start(now);
+  if (hardModeActive()) hardMode.start(now); // resets killer metrics for the run
+  else hardMode.resetMetrics(); // clear any stale hard metrics so a non-hard run logs none
   beginFreeplayRun(now);
   setStartBtn();
 }
@@ -492,6 +638,9 @@ els.progBtn.addEventListener('click', (e) => {
     $('flash').classList.remove('show');
     hud.show();
     setProgramLock(els, true);
+    // Clean killer-metric slate so the Lookout segment's per-segment diff is correct.
+    hardMode.stop();
+    hardMode.resetMetrics();
     ui.progStart = { epoch: Date.now(), perf: now, settingsSnapshot: liveSettingsSnapshot() };
     program.start(now);
     updateStatsPanel(els, session);
@@ -511,6 +660,20 @@ $('dashBtn').addEventListener('click', (e) => {
   }
 });
 
+// ---------------- mode UI helpers ----------------
+function updateHint(): void {
+  els.hint.textContent =
+    session.mode === 'hard'
+      ? 'MOVE MOUSE or ◄ ► to look — SPACE to hit — spot the killer'
+      : HINTS[ui.input];
+}
+function syncModeUI(): void {
+  els.specialRow.classList.toggle('show', session.mode === 'special');
+  $('hardPanel').classList.toggle('show', session.mode === 'hard');
+  els.pacingSel.disabled = !session.isRepair();
+  updateHint();
+}
+
 // ---------------- UI wiring ----------------
 for (const el of els.tabs) {
   const activate = (): void => {
@@ -519,11 +682,11 @@ for (const el of els.tabs) {
     setTabSelection(els.tabs, (el.dataset.mode ?? 'gen') as Mode);
     session.mode = (el.dataset.mode ?? 'gen') as Mode;
     session.stop();
+    hardMode.stop();
     session.check = null;
     session.charges = 0;
     setStartBtn();
-    els.specialRow.classList.toggle('show', session.mode === 'special');
-    els.pacingSel.disabled = !session.isRepair();
+    syncModeUI();
     settings.lastMode = session.mode;
     persistSettings();
     drawTapeNow();
@@ -550,7 +713,7 @@ els.pacingSel.addEventListener('change', (e) => {
 });
 els.inputSel.addEventListener('change', (e) => {
   ui.input = (e.target as HTMLSelectElement).value as InputMode;
-  els.hint.textContent = HINTS[ui.input];
+  updateHint();
   settings.inputMode = ui.input;
   persistSettings();
 });
@@ -671,6 +834,58 @@ slider(els.sliders.dial, els.sliderVals.dial, (v) => `${(v / 100).toFixed(2)}×`
   persistSettings();
 });
 
+// ---------------- Hard Mode tunables (all APPROXIMATED training knobs) ----------------
+function hardSlider(id: string, valId: string, fmt: (v: number) => string, set: (v: number) => void): void {
+  const input = $(id) as HTMLInputElement;
+  const valEl = $(valId);
+  input.addEventListener('input', () => {
+    const v = +input.value;
+    set(v);
+    valEl.textContent = fmt(v);
+    hardMode.cfg = buildHardConfig();
+    persistSettings();
+  });
+}
+const approachFmt = (v: number): string => `${(v / 1000).toFixed(1)} s`;
+const coneFmt = (v: number): string => `${v}°`;
+const secFmt = (v: number): string => `${v} s`;
+const pctFmt = (v: number): string => `${v}%`;
+const panFmt = (v: number): string => `${(v / 100).toFixed(2)}×`;
+hardSlider('rHardApproach', 'vHardApproach', approachFmt, (v) => (settings.hardApproachMs = v));
+hardSlider('rHardCone', 'vHardCone', coneFmt, (v) => (settings.hardCatchConeDeg = v));
+hardSlider('rHardMin', 'vHardMin', secFmt, (v) => (settings.hardEncounterMinS = v));
+hardSlider('rHardMax', 'vHardMax', secFmt, (v) => (settings.hardEncounterMaxS = v));
+hardSlider('rHardPenalty', 'vHardPenalty', pctFmt, (v) => (settings.hardMissPenaltyPct = v));
+hardSlider('rHardPan', 'vHardPan', panFmt, (v) => (settings.hardPanSensitivity = v / 100));
+hardSlider('rHardDanger', 'vHardDanger', pctFmt, (v) => (settings.hardDangerCueIntensity = v / 100));
+
+function reflectHardDangerToggle(): void {
+  const t = $('hardDangerToggle');
+  t.classList.toggle('on', settings.hardDangerCue);
+  t.setAttribute('aria-pressed', String(settings.hardDangerCue));
+  t.textContent = settings.hardDangerCue ? 'Danger cue: on' : 'Danger cue: off';
+}
+$('hardDangerToggle').addEventListener('click', () => {
+  settings.hardDangerCue = !settings.hardDangerCue;
+  reflectHardDangerToggle();
+  hardMode.cfg = buildHardConfig();
+  persistSettings();
+});
+
+function reflectHardSliders(): void {
+  const setS = (id: string, valId: string, value: number, fmt: (v: number) => string): void => {
+    ($(id) as HTMLInputElement).value = String(value);
+    $(valId).textContent = fmt(value);
+  };
+  setS('rHardApproach', 'vHardApproach', settings.hardApproachMs, approachFmt);
+  setS('rHardCone', 'vHardCone', settings.hardCatchConeDeg, coneFmt);
+  setS('rHardMin', 'vHardMin', settings.hardEncounterMinS, secFmt);
+  setS('rHardMax', 'vHardMax', settings.hardEncounterMaxS, secFmt);
+  setS('rHardPenalty', 'vHardPenalty', settings.hardMissPenaltyPct, pctFmt);
+  setS('rHardPan', 'vHardPan', Math.round(settings.hardPanSensitivity * 100), panFmt);
+  setS('rHardDanger', 'vHardDanger', Math.round(settings.hardDangerCueIntensity * 100), pctFmt);
+}
+
 // ---------------- boot ----------------
 function applySettingsToUi(): void {
   ui.input = settings.inputMode;
@@ -694,9 +909,11 @@ function applySettingsToUi(): void {
   session.mode = settings.lastMode;
   session.special = settings.lastSpecial;
   setTabSelection(els.tabs, session.mode);
-  els.specialRow.classList.toggle('show', session.mode === 'special');
   els.specialSel.value = settings.lastSpecial;
-  els.pacingSel.disabled = !session.isRepair();
+  syncModeUI();
+  reflectHardSliders();
+  reflectHardDangerToggle();
+  hardMode.cfg = buildHardConfig();
   applyMotionPrefs();
   applyPalette();
 }
@@ -712,5 +929,5 @@ requestAnimationFrame(loop);
 // Dev-only handle so headless tooling can drive frames when RAF is throttled
 // (hidden windows). Stripped from production builds.
 if (import.meta.env.DEV) {
-  (window as unknown as Record<string, unknown>).__trainer = { session, program, frame, dashboard, storage };
+  (window as unknown as Record<string, unknown>).__trainer = { session, program, frame, dashboard, storage, hardMode, scene };
 }

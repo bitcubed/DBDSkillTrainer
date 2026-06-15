@@ -8,6 +8,7 @@ import type { RunStats, SegmentResult, SessionRecord, Settings } from '../engine
 import {
   appendRecord,
   freeplayWorthLogging,
+  type KillerSummary,
   makeSessionRecord,
   snapshotStats,
   type StatsSnapshot,
@@ -56,7 +57,12 @@ export class RunLogger {
    * Close out the free-play run. Returns the updated history when the run was
    * logged (≥10 checks), or null when there was nothing worth logging.
    */
-  endFreeplay(stats: RunStats, errCountTotal: number, perfNow: number): SessionRecord[] | null {
+  endFreeplay(
+    stats: RunStats,
+    errCountTotal: number,
+    perfNow: number,
+    killer?: KillerSummary,
+  ): SessionRecord[] | null {
     const run = this.run;
     if (!run) return null;
     this.run = null;
@@ -75,6 +81,7 @@ export class RunLogger {
         bestStreak: stats.best,
         errsMs: errsSince(stats.errs, errCountTotal, run.snap.errCount),
         settingsSnapshot: run.settingsSnapshot,
+        killer,
       }),
       this.storage,
     );
@@ -87,6 +94,7 @@ export class RunLogger {
     epochMs: number,
     durationS: number,
     settingsSnapshot: Partial<Settings>,
+    killer?: KillerSummary,
   ): SessionRecord[] {
     return appendRecord(
       makeSessionRecord({
@@ -100,6 +108,7 @@ export class RunLogger {
         errsMs: stats.errs.map((e) => e.ms),
         segments,
         settingsSnapshot,
+        killer,
       }),
       this.storage,
     );

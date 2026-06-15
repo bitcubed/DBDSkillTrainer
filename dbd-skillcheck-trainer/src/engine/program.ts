@@ -14,7 +14,13 @@ import { errsSince, meanSd } from '../analytics/stats';
 import type { Session } from './session';
 import type { Mode, SegmentResult, SpecialId } from './types';
 
-export type SegmentKind = 'gen' | 'rotate' | 'storm';
+export type SegmentKind = 'gen' | 'rotate' | 'storm' | 'hard';
+
+/** Cumulative killer-lookout metrics, read by the Program for the Lookout segment. */
+export interface KillerMetrics {
+  spotted: number;
+  encounters: number;
+}
 
 export interface ProgramSegment {
   name: string;
@@ -29,9 +35,10 @@ export interface ProgramSegment {
 
 export const PROGRAM: readonly ProgramSegment[] = [
   { name: 'Warm-up',  trains: 'Find your rhythm',           durS: 45, kind: 'gen',    speed: 1.0, zone: 1.0, warnMs: 500, bg: false },
-  { name: 'Overload', trains: 'Faster + smaller than real', durS: 75, kind: 'gen',    speed: 1.4, zone: 0.7, warnMs: 350, bg: false },
-  { name: 'Varied',   trains: 'Contextual interference',    durS: 75, kind: 'rotate', speed: 1.0, zone: 1.0, warnMs: 500, bg: true },
-  { name: 'Bias-fix', trains: 'Center your timing tape',    durS: 45, kind: 'gen',    speed: 1.0, zone: 1.0, warnMs: 500, bg: false },
+  { name: 'Overload', trains: 'Faster + smaller than real', durS: 60, kind: 'gen',    speed: 1.4, zone: 0.7, warnMs: 350, bg: false },
+  { name: 'Varied',   trains: 'Contextual interference',    durS: 60, kind: 'rotate', speed: 1.0, zone: 1.0, warnMs: 500, bg: true },
+  { name: 'Bias-fix', trains: 'Center your timing tape',    durS: 30, kind: 'gen',    speed: 1.0, zone: 1.0, warnMs: 500, bg: false },
+  { name: 'Lookout',  trains: 'Scan for the killer',        durS: 45, kind: 'hard',   speed: 1.0, zone: 1.0, warnMs: 500, bg: false },
   { name: 'Pressure', trains: 'Continuous under fatigue',   durS: 60, kind: 'storm',  speed: 1.0, zone: 1.0, warnMs: 120, bg: false },
 ];
 
@@ -58,6 +65,8 @@ interface StatsSnap {
   gd: number;
   m: number;
   e: number;
+  ks: number; // killer spotted
+  ke: number; // killer encounters
 }
 
 export interface ProgramHooks {
@@ -85,6 +94,8 @@ export class ProgramController {
   constructor(
     private readonly session: Session,
     private readonly hooks: ProgramHooks = {},
+    /** Reads live Hard Mode metrics so the Lookout segment can record spotted-rate. */
+    private readonly readKiller?: () => KillerMetrics,
   ) {}
 
   currentSegment(): ProgramSegment | null {
@@ -170,6 +181,11 @@ export class ProgramController {
     } else if (seg.kind === 'rotate') {
       s.storm = false;
       this.applyVariedRot(0, now);
+    } else if (seg.kind === 'hard') {
+      // Lookout: generator checks + the killer overlay (main.ts starts HardMode
+      // off the onSegment hook when it sees mode === 'hard').
+      s.mode = 'hard';
+      s.storm = false;
     } else {
       s.mode = 'gen';
       s.storm = false;
@@ -198,9 +214,17 @@ export class ProgramController {
 
   private snapStats(): StatsSnap {
     const st = this.session.stats;
+    const k = this.readKiller?.() ?? { spotted: 0, encounters: 0 };
     // The error snapshot uses the session's monotone counter, not an array
     // index — indices slide once the errs array hits its cap mid-Program.
-    return { g: st.great, gd: st.good, m: st.miss, e: this.session.errCountTotal };
+    return {
+      g: st.great,
+      gd: st.good,
+      m: st.miss,
+      e: this.session.errCountTotal,
+      ks: k.spotted,
+      ke: k.encounters,
+    };
   }
 
   /** Diff cumulative stats against the snapshot taken at the segment boundary. */
@@ -215,7 +239,7 @@ export class ProgramController {
     const goods = st.good - s.gd;
     const misses = st.miss - s.m;
     const { mean, sd } = meanSd(errs);
-    this.segStats.push({
+    const result: SegmentResult = {
       name: seg.name,
       greats,
       goods,
@@ -223,7 +247,15 @@ export class ProgramController {
       hits: greats + goods + misses,
       meanMs: mean,
       sdMs: sd,
-    });
+    };
+    if (seg.kind === 'hard' && this.readKiller) {
+      const k = this.readKiller();
+      // Clamp: defends against a non-zero baseline (e.g. a prior standalone Hard
+      // run) if the metrics weren't reset before the Program started.
+      result.killerEncounters = Math.max(0, k.encounters - s.ke);
+      result.killerSpotted = Math.max(0, k.spotted - s.ks);
+    }
+    this.segStats.push(result);
   }
 
   private advanceSegment(now: number): void {
