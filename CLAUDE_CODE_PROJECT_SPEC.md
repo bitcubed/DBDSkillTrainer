@@ -505,25 +505,43 @@ differences (engine math is otherwise verbatim — see `CHANGELOG.md`):
 `Mode` (`'hard'`) AND a 6th "Lookout" Program segment. It is additive; the base
 game engine math/feel is unchanged.
 
-- **Architecture.** Pure killer/yaw state machine + catch math in
-  `engine/hardMode.ts` (clock- and RNG-injected, fully unit-tested:
-  `tests/hardMode.test.ts`); original 2.5D Canvas panorama + generic killer in
-  `render/scene.ts`; mode wiring, input (mouse-pan + ◄►/A-D/Q-E turn + Space),
+- **Architecture.** Pure first-person camera (360° `yaw` + clamped up/down
+  `pitch`) + killer state machine + catch math in `engine/hardMode.ts` (clock- and
+  RNG-injected, fully unit-tested: `tests/hardMode.test.ts`); original color-graded
+  2.5D Canvas panorama + generic killer in `render/scene.ts`; mode wiring, input
+  (pointer-lock FPS mouse-look + edge-pan fallback + ◄►▲▼/WASD/Q-E keys + Space),
   and the killer↔progress penalty in `main.ts`. No new dependencies; the engine
   stays framework-free TS + Canvas.
+- **Look controls.** Primary input is **pointer-lock FPS mouse-look**: clicking
+  the scene captures/contains the cursor and raw mouse movement drives the view
+  (`applyLook(dYaw, dPitch)`, deg/px = `HARD_LOOK_DEG_PER_PX × panSensitivity`);
+  ESC frees it. Fallbacks: position-based **edge-pan** when the pointer isn't
+  locked (touch / unsupported), and keyboard yaw (◄►/A-D/Q-E) + pitch (▲▼/W-S),
+  velocity-applied in `tick`. Pitch is clamped to ±`pitchMaxDeg`; the render
+  shifts the whole scene vertically by pitch.
 - **Killer state machine.** `idle → approaching → caught | reached`. Caught =
-  view-center within `catchConeDeg` of the killer for ≥ `catchDwellMs` (records
-  reaction time); reached = the `approachMs` window elapses uncaught (counts as a
-  miss + a `missPenaltyPct` gen-progress hit + a scare; the run continues).
+  reticle on the killer in **both** axes — yaw within `catchConeDeg` AND pitch
+  within `catchPitchTolDeg` of the (ground-standing) killer — held for ≥
+  `catchDwellMs` (records reaction time); reached = the `approachMs` window elapses
+  uncaught (counts as a miss + a `missPenaltyPct` gen-progress hit + a scare; the
+  run continues).
 - **Tunables** (APPROXIMATED — labeled in the UI footer + a Hard-Mode settings
   panel, persisted in `Settings`): approachMs (~3000), catchConeDeg (~15),
-  catchDwellMs (~180, fixed), fovDeg (~90, fixed), pan sensitivity, encounter
-  min/max gap (~8–20s), missPenaltyPct (~5), danger-cue on/off + intensity.
+  catchDwellMs (~180, fixed), catchPitchTolDeg (~12, fixed), pitchMaxDeg (~38,
+  fixed), fovDeg (~90, fixed), look sensitivity, invert-Y, encounter min/max gap
+  (~8–20s), missPenaltyPct (~5), danger-cue on/off + intensity.
 - **Divergences (documented):**
   - **Centered dial.** Hard Mode runs centered generator checks (Doctor
     off-centre suppressed), so the dial HUD overlays the scene at screen center.
   - **Space-to-hit.** The mouse is busy looking, so Space resolves checks
-    regardless of the Input setting; clicks do not resolve checks in this mode.
+    regardless of the Input setting; in this mode a stage click (re)captures the
+    pointer rather than resolving a check.
+  - **Decorative color grade.** The scene's brighter overcast-autumn palette
+    (slate-blue→warm-hazy sky gradient, diffuse overcast light, warm amber/umber
+    ground, olive foliage + hazy treeline silhouettes, warm ember ground glow,
+    light warm vignette, warm killer backlight) is atmosphere only — result meaning
+    still rides `ResultPalette` and the killer reads by shape + bright outline, so
+    it doesn't encode information by hue.
 - **Analytics.** History schema bumped to **v2** with optional killer metrics
   (`killerEncounters`, `killerSpotted`, `killerSpottedRate`, `avgReactionMs` on
   `overall`; `killerEncounters`/`killerSpotted` on the Lookout `SegmentResult`).
@@ -532,8 +550,9 @@ game engine math/feel is unchanged.
   when Hard Mode runs exist.
 - **Accessibility.** Reduced motion cuts the scare shake/flash and steps the
   approach; the killer reads by shape + bright outline (not red hue alone) and
-  uses the colorblind-safe danger color; the ◄►/A-D/Q-E turn keeps it fully
-  keyboard-operable. Base modes remain usable without a mouse.
+  uses the colorblind-safe danger color; the ◄►▲▼ / A-D / W-S / Q-E keys keep it
+  fully keyboard-operable (no pointer lock required). Base modes remain usable
+  without a mouse.
 - **Source of truth.** The port (`src/`) is now authoritative; the single-file
   `dbd-skillcheck-trainer.html` prototype is a frozen legacy reference and does
   **not** include Hard Mode (see CLAUDE.md).

@@ -4,7 +4,7 @@ import './styles/main.css';
 import { loadHistory, type KillerSummary, type StorageLike } from './analytics/history';
 import { RunLogger } from './analytics/runLog';
 import { Synth } from './audio/synth';
-import { GEN_CHARGES } from './engine/constants';
+import { GEN_CHARGES, HARD_LOOK_DEG_PER_PX } from './engine/constants';
 import { defaultHardConfig, HardMode, type HardConfig } from './engine/hardMode';
 import { ProgramController } from './engine/program';
 import { Session, type ResolveEvent } from './engine/session';
@@ -447,6 +447,7 @@ function frame(now: number): void {
   session.tick(now);
   const inHard = hardModeActive() && session.running;
   if (inHard) hardMode.tick(now, dt);
+  syncLookPrompt(); // keep the capture prompt / cursor / auto-release in sync with run state
 
   // Background: Hard Mode's scene IS the backdrop, so hide the noise field there.
   if (inHard) {
@@ -481,6 +482,7 @@ function frame(now: number): void {
     // Scene first (clears the canvas), then the centered dial HUD overlays it.
     scene.draw(ctx, W, H, {
       yaw: hardMode.yaw,
+      pitch: hardMode.pitch,
       fovDeg: hardMode.cfg.fovDeg,
       killerActive: hardMode.killerActive(),
       killerYaw: hardMode.killerYaw(),
@@ -510,13 +512,21 @@ function press(now: number): void {
   session.press(now);
 }
 
-// Hard Mode keyboard look-turn fallback (project rule: fully keyboard-operable).
+// Hard Mode keyboard look fallback (project rule: fully keyboard-operable).
+// Horizontal (yaw): ◄ ► / A-D / Q-E. Vertical (pitch): ▲ ▼ / W-S.
 const TURN_LEFT = new Set(['ArrowLeft', 'KeyA', 'KeyQ']);
 const TURN_RIGHT = new Set(['ArrowRight', 'KeyD', 'KeyE']);
+const LOOK_UP = new Set(['ArrowUp', 'KeyW']);
+const LOOK_DOWN = new Set(['ArrowDown', 'KeyS']);
 let turnL = false;
 let turnR = false;
+let lookU = false;
+let lookD = false;
 function syncKeyTurn(): void {
   hardMode.setKeyTurn((turnR ? 1 : 0) - (turnL ? 1 : 0));
+}
+function syncKeyPitch(): void {
+  hardMode.setKeyPitch((lookU ? 1 : 0) - (lookD ? 1 : 0));
 }
 
 window.addEventListener('keydown', (e) => {
@@ -529,15 +539,27 @@ window.addEventListener('keydown', (e) => {
     if (!e.repeat) press(e.timeStamp || performance.now());
     return;
   }
-  // Hard Mode look-turn (arrow / A-D / Q-E).
+  // Hard Mode look (yaw: arrow/A-D/Q-E; pitch: arrow/W-S).
   if (hardModeActive() && session.running) {
     if (TURN_LEFT.has(e.code)) {
       turnL = true;
       syncKeyTurn();
+      keyboardLooking = true;
       e.preventDefault();
     } else if (TURN_RIGHT.has(e.code)) {
       turnR = true;
       syncKeyTurn();
+      keyboardLooking = true;
+      e.preventDefault();
+    } else if (LOOK_UP.has(e.code)) {
+      lookU = true;
+      syncKeyPitch();
+      keyboardLooking = true;
+      e.preventDefault();
+    } else if (LOOK_DOWN.has(e.code)) {
+      lookD = true;
+      syncKeyPitch();
+      keyboardLooking = true;
       e.preventDefault();
     }
   }
@@ -549,31 +571,116 @@ window.addEventListener('keyup', (e) => {
   } else if (TURN_RIGHT.has(e.code)) {
     turnR = false;
     syncKeyTurn();
+  } else if (LOOK_UP.has(e.code)) {
+    lookU = false;
+    syncKeyPitch();
+  } else if (LOOK_DOWN.has(e.code)) {
+    lookD = false;
+    syncKeyPitch();
   }
 });
-// Losing focus mid-pan can swallow the keyup — clear held turn keys so the view
-// doesn't keep spinning when the tab regains focus.
+// Losing focus mid-look can swallow the keyup — clear held keys so the view
+// doesn't keep spinning/tilting when the tab regains focus.
 window.addEventListener('blur', () => {
   if (turnL || turnR) {
     turnL = false;
     turnR = false;
     syncKeyTurn();
   }
+  if (lookU || lookD) {
+    lookU = false;
+    lookD = false;
+    syncKeyPitch();
+  }
 });
-// Mouse-look in Hard Mode: horizontal position over the stage pans the view (no
-// pointer lock); a central deadzone, faster toward the edges.
+// ---- Hard Mode FPS mouse-look (pointer lock) ----
+// While the pointer is locked to the stage, raw mouse movement drives the view
+// like an FPS camera (movementX → yaw, movementY → pitch); the cursor is hidden
+// and contained. When NOT locked (touch, or before/after capture) we fall back to
+// the original edge-pan: horizontal position over the stage pans the view.
+const pointerLockSupported = (): boolean =>
+  typeof stage.requestPointerLock === 'function' && 'pointerLockElement' in document;
+const lookLocked = (): boolean => document.pointerLockElement === stage;
+// The capture prompt is mouse/ESC-specific — don't show it to touch-primary devices.
+const PRIMARY_COARSE =
+  typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+// Once the player drives with the keyboard, stop nagging them to "click to look"
+// (project rule: Hard Mode is fully keyboard-operable, no pointer lock required).
+let keyboardLooking = false;
+
+function requestLook(): void {
+  if (!(hardModeActive() && session.running && pointerLockSupported() && !lookLocked())) return;
+  try {
+    // Modern engines return a Promise that REJECTS when refused — most often the
+    // ~1.25s re-lock throttle right after an Esc exit, or an unfocused document.
+    // Swallow it (the capture prompt stays up; a later click retries); a sync
+    // try/catch alone can't catch the async rejection.
+    const p = stage.requestPointerLock() as unknown;
+    if (p && typeof (p as Promise<void>).catch === 'function') {
+      (p as Promise<void>).catch(() => undefined);
+    }
+  } catch {
+    // legacy engines may throw synchronously instead
+  }
+}
+// Belt-and-suspenders for engines that fire the event rather than rejecting.
+document.addEventListener('pointerlockerror', () => undefined);
+
+function syncLookPrompt(): void {
+  const liveHard = hardModeActive() && session.running;
+  // Release the mouse automatically when the hard run ends or the mode changes.
+  if (lookLocked() && !liveHard) {
+    try {
+      document.exitPointerLock();
+    } catch {
+      // best-effort
+    }
+  }
+  // Show "click to capture" only while a hard run is live, the mouse is free, the
+  // player isn't already driving by keyboard, and this is a mouse-primary device.
+  stage.classList.toggle(
+    'needslook',
+    liveHard && pointerLockSupported() && !lookLocked() && !keyboardLooking && !PRIMARY_COARSE,
+  );
+  stage.classList.toggle('looklocked', lookLocked());
+}
+
+document.addEventListener('pointerlockchange', () => {
+  if (!lookLocked()) hardMode.setMousePan(0.5); // drop any residual edge-pan velocity
+  syncLookPrompt();
+});
+
+// FPS deltas (fire on the locked element). movementY up is negative → +pitch (look
+// up) unless inverted.
+document.addEventListener('mousemove', (e) => {
+  if (!lookLocked() || !hardModeActive() || !session.running) return;
+  const sens = HARD_LOOK_DEG_PER_PX * settings.hardPanSensitivity;
+  const invert = settings.hardInvertY ? 1 : -1;
+  hardMode.applyLook((e.movementX || 0) * sens, (e.movementY || 0) * sens * invert);
+});
+
+// Edge-pan fallback (only when not pointer-locked — when locked, clientX is frozen
+// and would otherwise inject a constant phantom pan).
 stage.addEventListener('pointermove', (e) => {
-  if (!hardModeActive() || !session.running) return;
+  if (!hardModeActive() || !session.running || lookLocked()) return;
   const r = stage.getBoundingClientRect();
   hardMode.setMousePan(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)));
 });
 stage.addEventListener('pointerleave', () => {
-  if (hardModeActive()) hardMode.setMousePan(0.5); // recenter → stop panning
+  if (hardModeActive() && !lookLocked()) hardMode.setMousePan(0.5); // recenter → stop panning
 });
+
 // Left click (or tap) anywhere counts as a press — matches an M1 skill-check
-// bind. Excluded in Hard Mode (the mouse is for looking) and over controls.
+// bind. In Hard Mode the mouse is for looking: a click on the stage (re)captures
+// the pointer instead of resolving a check; clicks never resolve checks here.
 document.addEventListener('pointerdown', (e) => {
-  if (hardModeActive() || ui.input === 'space' || e.button !== 0 || !session.running) return;
+  if (hardModeActive()) {
+    if (session.running && e.button === 0 && !(e.target as Element).closest('button,select,input,a,.chip,.tab')) {
+      requestLook();
+    }
+    return;
+  }
+  if (ui.input === 'space' || e.button !== 0 || !session.running) return;
   if ((e.target as Element).closest('button,select,input,a,.chip,.tab')) return;
   e.preventDefault();
   press(e.timeStamp || performance.now());
@@ -602,8 +709,11 @@ function startStop(): void {
     return;
   }
   session.start(now);
-  if (hardModeActive()) hardMode.start(now); // resets killer metrics for the run
-  else hardMode.resetMetrics(); // clear any stale hard metrics so a non-hard run logs none
+  if (hardModeActive()) {
+    hardMode.start(now); // resets killer metrics for the run
+    keyboardLooking = false; // fresh run: show the capture prompt until the player looks
+    requestLook(); // capture the mouse FPS-style (Start click is the user gesture)
+  } else hardMode.resetMetrics(); // clear any stale hard metrics so a non-hard run logs none
   beginFreeplayRun(now);
   setStartBtn();
 }
@@ -664,7 +774,7 @@ $('dashBtn').addEventListener('click', (e) => {
 function updateHint(): void {
   els.hint.textContent =
     session.mode === 'hard'
-      ? 'MOVE MOUSE or ◄ ► to look — SPACE to hit — spot the killer'
+      ? 'MOUSE-LOOK (click to capture · ESC frees) — ◄►▲▼/WASD — SPACE to hit — spot the killer'
       : HINTS[ui.input];
 }
 function syncModeUI(): void {
@@ -872,6 +982,18 @@ $('hardDangerToggle').addEventListener('click', () => {
   persistSettings();
 });
 
+function reflectHardInvertToggle(): void {
+  const t = $('hardInvertToggle');
+  t.classList.toggle('on', settings.hardInvertY);
+  t.setAttribute('aria-pressed', String(settings.hardInvertY));
+  t.textContent = settings.hardInvertY ? 'Invert Y: on' : 'Invert Y: off';
+}
+$('hardInvertToggle').addEventListener('click', () => {
+  settings.hardInvertY = !settings.hardInvertY;
+  reflectHardInvertToggle();
+  persistSettings();
+});
+
 function reflectHardSliders(): void {
   const setS = (id: string, valId: string, value: number, fmt: (v: number) => string): void => {
     ($(id) as HTMLInputElement).value = String(value);
@@ -913,6 +1035,7 @@ function applySettingsToUi(): void {
   syncModeUI();
   reflectHardSliders();
   reflectHardDangerToggle();
+  reflectHardInvertToggle();
   hardMode.cfg = buildHardConfig();
   applyMotionPrefs();
   applyPalette();

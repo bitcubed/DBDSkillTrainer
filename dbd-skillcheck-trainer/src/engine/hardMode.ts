@@ -1,7 +1,8 @@
-// Hard Mode (divided-attention / killer-lookout) engine: a virtual 360° yaw you
-// pan with the mouse/keys, and a killer that approaches over a window which you
-// must "catch" by holding it within a central cone. Pure, headless, clock- and
-// RNG-injected so it unit-tests without a DOM or render layer.
+// Hard Mode (divided-attention / killer-lookout) engine: a virtual first-person
+// camera (360° yaw + clamped up/down pitch) you steer FPS-style, and a killer
+// that approaches over a window which you must "catch" by holding it within a
+// central cone (both axes). Pure, headless, clock- and RNG-injected so it
+// unit-tests without a DOM or render layer.
 //
 // All values are APPROXIMATED training knobs (see constants HARD_DEFAULTS), not
 // game data. The killer is a generic original silhouette (see render/scene.ts).
@@ -12,6 +13,8 @@ export interface HardConfig {
   approachMs: number;
   catchConeDeg: number;
   catchDwellMs: number;
+  catchPitchTolDeg: number;
+  pitchMaxDeg: number;
   fovDeg: number;
   panSensitivity: number;
   panMaxDegPerSec: number;
@@ -38,6 +41,11 @@ export function wrapYaw(deg: number): number {
 /** Signed shortest angular difference a−b, in [-180, 180]. */
 export function angleDelta(a: number, b: number): number {
   return ((a - b + 540) % 360) - 180;
+}
+
+/** Clamp x to [-limit, +limit]. */
+export function clampSym(x: number, limit: number): number {
+  return x < -limit ? -limit : x > limit ? limit : x;
 }
 
 /**
@@ -72,6 +80,7 @@ export function panVelocity(frac: number, cfg: HardConfig): number {
 
 interface Killer {
   yaw: number;
+  pitch: number; // world pitch of the body's aim point; 0 = stands at horizon level
   spawnAt: number;
   dwellMs: number;
 }
@@ -85,6 +94,8 @@ export interface HardEvents {
 export class HardMode {
   /** View-center yaw, [0, 360). */
   yaw = 0;
+  /** View pitch, degrees; 0 = level, + = looking up. Clamped to ±cfg.pitchMaxDeg. */
+  pitch = 0;
   cfg: HardConfig;
 
   // Cumulative resolved outcomes since start() (encounters = spotted + missed).
@@ -92,8 +103,9 @@ export class HardMode {
   missed = 0;
   reactionMsSum = 0;
 
-  private panVel = 0; // deg/s from the mouse
-  private keyTurn = 0; // -1 | 0 | 1 from the keyboard fallback
+  private panVel = 0; // deg/s from the mouse edge-pan fallback (no pointer lock)
+  private keyTurn = 0; // -1 | 0 | 1 yaw, from the keyboard fallback
+  private keyPitch = 0; // -1 | 0 | 1 pitch, from the keyboard fallback
   private killer: Killer | null = null;
   private nextSpawnAt = 0;
   private started = false;
@@ -109,9 +121,11 @@ export class HardMode {
   start(now: number): void {
     this.started = true;
     this.yaw = this.rng() * 360;
+    this.pitch = 0;
     this.killer = null;
     this.panVel = 0;
     this.keyTurn = 0;
+    this.keyPitch = 0;
     this.spotted = 0;
     this.missed = 0;
     this.reactionMsSum = 0;
@@ -123,6 +137,7 @@ export class HardMode {
     this.killer = null;
     this.panVel = 0;
     this.keyTurn = 0;
+    this.keyPitch = 0;
   }
 
   /** Zero the metrics without starting (clean slate before a Program). */
@@ -136,7 +151,17 @@ export class HardMode {
     return this.started;
   }
 
-  /** Mouse position 0..1 across the stage width drives pan velocity. */
+  /**
+   * FPS mouse-look: apply a relative view delta (degrees) directly, the way a
+   * pointer-locked first-person camera does. + yaw turns right; + pitch looks up.
+   * Pitch is clamped to ±cfg.pitchMaxDeg; yaw wraps.
+   */
+  applyLook(dYawDeg: number, dPitchDeg: number): void {
+    if (dYawDeg) this.yaw = wrapYaw(this.yaw + dYawDeg);
+    if (dPitchDeg) this.pitch = clampSym(this.pitch + dPitchDeg, this.cfg.pitchMaxDeg);
+  }
+
+  /** Mouse position 0..1 across the stage width drives pan velocity (no-lock fallback). */
   setMousePan(frac: number): void {
     this.panVel = panVelocity(frac, this.cfg);
   }
@@ -146,6 +171,11 @@ export class HardMode {
     this.keyTurn = dir < 0 ? -1 : dir > 0 ? 1 : 0;
   }
 
+  /** Keyboard tilt fallback: +1 up, -1 down, 0 none. */
+  setKeyPitch(dir: number): void {
+    this.keyPitch = dir < 0 ? -1 : dir > 0 ? 1 : 0;
+  }
+
   private scheduleNext(now: number): void {
     const span = Math.max(0, this.cfg.encounterMaxMs - this.cfg.encounterMinMs);
     this.nextSpawnAt = now + this.cfg.encounterMinMs + this.rng() * span;
@@ -153,23 +183,31 @@ export class HardMode {
 
   tick(now: number, dt: number): void {
     if (!this.started) return;
-    // Advance the view yaw (mouse pan + keyboard turn).
+    // Advance the view yaw (mouse edge-pan + keyboard turn). FPS mouse-look is
+    // applied immediately in applyLook(), not here.
     const turn = this.panVel + this.keyTurn * this.cfg.keyTurnDegPerSec;
     if (turn !== 0) this.yaw = wrapYaw(this.yaw + turn * dt);
+    // Advance the view pitch (keyboard tilt fallback).
+    if (this.keyPitch !== 0) {
+      this.pitch = clampSym(this.pitch + this.keyPitch * this.cfg.keyTurnDegPerSec * dt, this.cfg.pitchMaxDeg);
+    }
 
     if (!this.killer) {
       if (now >= this.nextSpawnAt) {
         // Spawn well away from where you're currently looking so it must be found.
         const offset = 70 + this.rng() * 220; // 70°..290° from current view
-        this.killer = { yaw: wrapYaw(this.yaw + offset), spawnAt: now, dwellMs: 0 };
+        this.killer = { yaw: wrapYaw(this.yaw + offset), pitch: 0, spawnAt: now, dwellMs: 0 };
         this.events.onSpawn?.(this.killer.yaw, now);
       }
       return;
     }
 
     const k = this.killer;
-    const off = Math.abs(angleDelta(k.yaw, this.yaw));
-    if (off <= this.cfg.catchConeDeg) k.dwellMs += dt * 1000;
+    // Catch needs the reticle on the killer in BOTH axes: yaw within the cone AND
+    // the view roughly level with the ground-standing figure (pitch tolerance).
+    const offYaw = Math.abs(angleDelta(k.yaw, this.yaw));
+    const offPitch = Math.abs(this.pitch - k.pitch);
+    if (offYaw <= this.cfg.catchConeDeg && offPitch <= this.cfg.catchPitchTolDeg) k.dwellMs += dt * 1000;
     else k.dwellMs = 0;
 
     if (k.dwellMs >= this.cfg.catchDwellMs) {

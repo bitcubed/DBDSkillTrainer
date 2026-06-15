@@ -26,13 +26,26 @@ Owner: Jonah (plays DBD; wants an accurate, research-grounded trainer he can dri
 ## 2. Current state (what already exists)
 
 **Update 2026-06-14 (later) — Hard Mode added.** New divided-attention "killer lookout"
-mode (and a "Lookout" Program segment): first-person 360° Canvas panorama you pan with the
-mouse / arrow keys while hitting checks, catching an approaching generic killer silhouette
-by centering your view on it. Pure killer/yaw state machine in `engine/hardMode.ts`
-(17 tests), original panorama in `render/scene.ts`, history schema v2 with optional killer
-metrics, a Hard-Mode settings panel, and a dashboard spotted-rate trend. Reduced-motion +
-colorblind-safe + fully keyboard-operable. See §5 for the locked decisions (centered dial,
-Space-to-hit, port-as-source-of-truth). Typecheck/lint clean, 136 tests, `vite build` clean.
+mode (and a "Lookout" Program segment): first-person 360° Canvas panorama you steer
+FPS-style while hitting checks, catching an approaching generic killer silhouette by putting
+your reticle on it. Pure killer/yaw+pitch state machine in `engine/hardMode.ts`, original
+panorama in `render/scene.ts`, history schema v2 with optional killer metrics, a Hard-Mode
+settings panel, and a dashboard spotted-rate trend. Reduced-motion + colorblind-safe + fully
+keyboard-operable. See §5 for the locked decisions (centered dial, Space-to-hit,
+port-as-source-of-truth).
+
+**Update 2026-06-14 (later still) — Hard Mode FPS look + color grade.** Mouse-look is now
+**pointer-lock FPS** (cursor captured/contained; raw movement → view): click the scene to
+capture, ESC to release, and look **up/down (pitch)** as well as left/right (yaw). Edge-pan
+survives as a no-pointer-lock / touch fallback; keyboard fallback gains ▲▼ / W-S for pitch.
+Catching now needs the reticle on the killer in **both** axes (yaw cone + a vertical
+"roughly level" tolerance, since the killer stands on the ground). The scene is
+**color-graded for a brighter, realistic DBD overcast-autumn mood** (muted slate-blue sky →
+warm hazy horizon, diffuse overcast light, warm amber/umber ground, olive foliage + hazy
+distant treeline, a warm ember ground glow, light warm vignette, warm killer backlight) —
+purely decorative: result meaning still rides the palette and the killer reads by shape +
+outline, so the colorblind-safe contract holds. New tunables: **Look sensitivity** (renamed
+from Pan) and **Invert Y**. Typecheck/lint clean, 143 tests, `vite build` clean.
 
 **Update 2026-06-14 — audio embedded; dial reworked to 1:1.** The owner provided
 three skill-check recordings (check-appears / good / great) and screenshots. After
@@ -187,13 +200,19 @@ practice distribution maps directly onto it:
     rhythm, and timing-bias awareness; exact timing should be calibrated in a DBD custom
     match. This caveat must stay visible in the UI.
   - **Hard Mode (added 2026-06-14)** is an *invented* divided-attention drill (first-person
-    killer-lookout): pan a 360° original Canvas scene while hitting checks, and "catch" an
-    approaching generic killer silhouette before it reaches you. Everything about it is
-    approximated training knobs (not game data), labeled as such in the footer + a settings
-    panel. The killer is a **generic, IP-safe original silhouette** (no game characters).
+    killer-lookout): steer a 360° original Canvas scene **FPS-style** while hitting checks,
+    and "catch" an approaching generic killer silhouette before it reaches you. Everything
+    about it is approximated training knobs (not game data), labeled as such in the footer +
+    a settings panel. The killer is a **generic, IP-safe original silhouette** (no game
+    characters); the scene's brighter overcast-autumn color grade is **decorative only**
+    (result meaning rides the palette; the killer reads by shape + outline → colorblind-safe holds).
     Hard Mode uses **centered** gen checks (no Doctor off-centre) so the dial HUD sits at
     screen center over the scene, and resolves checks with **Space** (the mouse is for
-    looking). It's a standalone mode AND a "Lookout" segment in the 5-min Program; history
+    looking). **Look = pointer-lock FPS mouse-look** (cursor captured; yaw + clamped up/down
+    pitch; click to capture, ESC to release), with an edge-pan fallback for touch / when lock
+    is unavailable and a full keyboard fallback (◄►▲▼ / WASD / Q-E). The catch needs the
+    reticle on the killer in both axes (yaw cone + a generous "roughly level" pitch
+    tolerance). It's a standalone mode AND a "Lookout" segment in the 5-min Program; history
     schema bumped to **v2** for optional killer metrics (backward-compatible).
 - **The port (`dbd-skillcheck-trainer/src/`) is the source of truth (since 2026-06-14).**
   The single-file `dbd-skillcheck-trainer.html` prototype is a **frozen legacy reference** —

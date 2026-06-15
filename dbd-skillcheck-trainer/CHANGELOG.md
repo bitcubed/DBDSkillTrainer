@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.4.0 — 2026-06-14 — Hard Mode: FPS mouse-look + DBD color grade
+
+### Changed
+- **FPS mouse-look (pointer lock).** Hard Mode now captures and contains the
+  cursor like a first-person shooter: **click the scene to capture** (raw mouse
+  movement drives the view), **ESC** frees it. The old position-based edge-pan
+  stays as a fallback when the pointer isn't locked (touch / unsupported).
+- **Look up/down (pitch).** The view now tilts vertically as well as horizontally,
+  so it reads like an in-game camera instead of a flat left/right sweep. Pitch is
+  clamped; the whole scene shifts vertically with it. Catching the killer now
+  needs the reticle on it in **both** axes (yaw cone + a generous "roughly level"
+  vertical tolerance, since the killer stands on the ground).
+- **DBD-style color grade.** The scene is recolored for a brighter, realistic
+  overcast-autumn mood (matching in-game killer-POV reference) — a muted slate-blue
+  sky warming to a hazy horizon, a diffuse overcast light, warm amber/umber ground,
+  olive-green foliage and hazy distant treeline silhouettes, a warm ember ground
+  glow rising from the foreground, a light warm vignette, and a warm backlight
+  separating the killer. Purely decorative: result meaning still rides the palette
+  and the killer reads by shape + outline, so the colorblind-safe contract is
+  unchanged.
+
+### Added
+- **Look sensitivity** slider (renamed from "Pan sensitivity") and an **Invert Y**
+  toggle in the Hard-Mode settings panel (persisted).
+- Keyboard pitch fallback: **▲ ▼ / W-S** (alongside the existing ◄ ► / A-D / Q-E
+  yaw keys); a "click to look around" capture prompt overlay.
+- Engine: `applyLook(dYaw, dPitch)`, `setKeyPitch(dir)`, `clampSym`, and a vertical
+  `catchPitchTolDeg` / `pitchMaxDeg`; new unit tests (143 total).
+
 ## 0.3.0 — 2026-06-14 — Hard Mode (divided-attention / killer lookout)
 
 ### Added

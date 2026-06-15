@@ -45,6 +45,7 @@
       <div class="ph-bar"><div class="ph-fill" id="phFill"></div></div>
     </div>
     <div id="flash"><div id="flashMain"></div><div id="flashSub"></div></div>
+    <div id="lookPrompt"><span class="lp-icon">🖱</span> Click to look around<span class="lp-sub">mouse-look · ESC frees the cursor · or ◄►▲▼ / WASD</span></div>
     <div id="hint">SPACE or LEFT CLICK anywhere to hit</div>
   </div>
 
@@ -130,13 +131,14 @@
         <input type="range" id="rHardMax" min="4" max="60" value="20" aria-label="Encounter max gap"></div>
       <div class="sl"><div class="lab"><span>Miss penalty</span><b id="vHardPenalty">5%</b></div>
         <input type="range" id="rHardPenalty" min="0" max="25" value="5" aria-label="Miss penalty"></div>
-      <div class="sl"><div class="lab"><span>Pan sensitivity</span><b id="vHardPan">1.00×</b></div>
-        <input type="range" id="rHardPan" min="40" max="250" value="100" aria-label="Pan sensitivity"></div>
+      <div class="sl"><div class="lab"><span>Look sensitivity</span><b id="vHardPan">1.00×</b></div>
+        <input type="range" id="rHardPan" min="40" max="250" value="100" aria-label="Look sensitivity"></div>
       <div class="sl"><div class="lab"><span>Danger cue intensity</span><b id="vHardDanger">50%</b></div>
         <input type="range" id="rHardDanger" min="0" max="100" value="50" aria-label="Danger cue intensity"></div>
     </div>
     <div class="hardpanel-row">
       <button class="chip" id="hardDangerToggle" role="button" aria-pressed="true">Danger cue: on</button>
+      <button class="chip" id="hardInvertToggle" role="button" aria-pressed="false">Invert Y: off</button>
     </div>
   </div>
 

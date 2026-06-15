@@ -65,16 +65,23 @@ export const APPROXIMATIONS = {
 // labels). The killer is a generic, original silhouette (no game characters).
 export const HARD_DEFAULTS = {
   approachMs: 3000, // time from spawn to "reached" if uncaught
-  catchConeDeg: 15, // angular tolerance from view-center to count as "looking at it"
+  catchConeDeg: 15, // horizontal (yaw) tolerance from view-center to count as "looking at it"
   catchDwellMs: 180, // must hold it centered this long to catch
+  catchPitchTolDeg: 12, // vertical (pitch) tolerance to still catch a ground-standing killer. APPROX: tuned so the boundary lands ~at the figure's edge under the fixed center reticle for a mid-approach killer (scene.ts shifts the view ~1.1% of height per degree of pitch); generous for far/small figures, by design.
+  pitchMaxDeg: 38, // how far up/down the view can tilt from level (FPS look clamp)
   fovDeg: 90, // visible horizontal slice of the 360° scene
-  panSensitivity: 1, // user multiplier on edge pan speed
-  panMaxDegPerSec: 160, // yaw speed when the mouse is at the screen edge
+  panSensitivity: 1, // user multiplier on look speed (FPS mouse-look + edge-pan fallback)
+  panMaxDegPerSec: 160, // yaw speed when the mouse is at the screen edge (touch / no-pointer-lock fallback)
   panDeadzone: 0.12, // central fraction of the width with no pan
-  keyTurnDegPerSec: 110, // arrow / Q-E turn speed (keyboard fallback)
+  keyTurnDegPerSec: 110, // arrow / Q-E / W-S turn+tilt speed (keyboard fallback)
   encounterMinMs: 8000, // randomized gap between encounters
   encounterMaxMs: 20000,
   missPenaltyPct: 5, // gen progress lost when the killer reaches you
   dangerCue: true, // faint screen-edge tint on the killer's side
   dangerCueIntensity: 0.5, // 0..1
 } as const;
+
+// FPS mouse-look: degrees of view rotation per pixel of raw mouse movement while
+// the pointer is locked (scaled further by panSensitivity). Pixel-domain, so it
+// lives here rather than in HardConfig (which is pure angles for unit tests).
+export const HARD_LOOK_DEG_PER_PX = 0.16;

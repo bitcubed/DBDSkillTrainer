@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { HARD_DEFAULTS } from '../src/engine/constants';
 import {
   angleDelta,
+  clampSym,
   defaultHardConfig,
   HardMode,
   panVelocity,
@@ -25,6 +26,13 @@ describe('yaw math', () => {
     expect(angleDelta(350, 10)).toBe(-20); // wraps the short way
     expect(angleDelta(10, 350)).toBe(20);
     expect(Math.abs(angleDelta(180, 0))).toBe(180);
+  });
+
+  it('clampSym bounds a value symmetrically', () => {
+    expect(clampSym(5, 10)).toBe(5);
+    expect(clampSym(15, 10)).toBe(10);
+    expect(clampSym(-15, 10)).toBe(-10);
+    expect(clampSym(0, 10)).toBe(0);
   });
 });
 
@@ -188,6 +196,90 @@ describe('HardMode state machine', () => {
     expect(hm.spottedRate()).toBeCloseTo(0.5, 6);
     expect(hm.avgReactionMs()).not.toBeNull();
     expect(hm.avgReactionMs()!).toBeGreaterThan(0);
+  });
+
+  it('starts level and applyLook turns yaw (wrapping) + tilts pitch (clamped)', () => {
+    const hm = new HardMode(cfg({ pitchMaxDeg: 38 }), rngOf([0, 999999])); // yaw=0, never spawn
+    hm.start(0);
+    expect(hm.pitch).toBe(0);
+    hm.applyLook(30, 10);
+    expect(hm.yaw).toBeCloseTo(30, 6);
+    expect(hm.pitch).toBeCloseTo(10, 6);
+    hm.applyLook(-50, 0); // yaw wraps past 0
+    expect(hm.yaw).toBeCloseTo(340, 6);
+    hm.applyLook(0, 100); // pitch clamps up
+    expect(hm.pitch).toBeCloseTo(38, 6);
+    hm.applyLook(0, -1000); // pitch clamps down
+    expect(hm.pitch).toBeCloseTo(-38, 6);
+  });
+
+  it('keyboard pitch tilts over time and clamps to pitchMaxDeg', () => {
+    const hm = new HardMode(cfg({ pitchMaxDeg: 38, keyTurnDegPerSec: 110 }), rngOf([0, 999999]));
+    hm.start(0);
+    hm.setKeyPitch(1); // up
+    hm.tick(16, 0.1); // +11°
+    expect(hm.pitch).toBeCloseTo(11, 4);
+    hm.setKeyPitch(-1); // down
+    hm.tick(32, 0.1); // back to ~0
+    expect(hm.pitch).toBeCloseTo(0, 4);
+    hm.setKeyPitch(1);
+    for (let i = 0; i < 10; i++) hm.tick(48 + i * 16, 0.1); // +110° worth → clamped
+    expect(hm.pitch).toBeCloseTo(38, 6);
+  });
+
+  it('catch needs the view roughly level: too far up/down misses even with yaw centered', () => {
+    const hm = new HardMode(cfg({ catchPitchTolDeg: 12 }), rngOf([0, 0, 0]));
+    hm.start(0);
+    let now = HARD_DEFAULTS.encounterMinMs;
+    hm.tick(now, 0.016); // spawn at 70°
+    hm.yaw = 70; // yaw dead center
+    hm.pitch = 30; // but looking well above the ground-standing killer
+    for (let i = 0; i < 10 && hm.killerActive(); i++) {
+      now += 30;
+      hm.tick(now, 0.03);
+    }
+    expect(hm.spotted).toBe(0); // not caught while looking away vertically
+    expect(hm.killerActive()).toBe(true); // still within approachMs
+    hm.pitch = 0; // level out
+    for (let i = 0; i < 20 && hm.killerActive(); i++) {
+      now += 30;
+      hm.tick(now, 0.03);
+    }
+    expect(hm.spotted).toBe(1); // now it catches
+  });
+
+  it('pitch tolerance is inclusive at the boundary and excludes just past it', () => {
+    const atBoundary = (pitch: number): boolean => {
+      const hm = new HardMode(cfg({ catchPitchTolDeg: 12, catchDwellMs: 60 }), rngOf([0, 0, 0]));
+      hm.start(0);
+      let now = HARD_DEFAULTS.encounterMinMs;
+      hm.tick(now, 0.016); // spawn at 70°
+      hm.yaw = 70;
+      hm.pitch = pitch;
+      for (let i = 0; i < 10 && hm.killerActive(); i++) {
+        now += 30;
+        hm.tick(now, 0.03);
+      }
+      return hm.spotted === 1;
+    };
+    expect(atBoundary(12)).toBe(true); // exactly the tolerance still catches (<=)
+    expect(atBoundary(12.5)).toBe(false); // just past it does not
+  });
+
+  it('a full two-axis catch can be driven entirely through applyLook()', () => {
+    // yaw=0, gap=min, offset 0 → killer at 70°, pitch 0.
+    const hm = new HardMode(cfg({ catchPitchTolDeg: 12 }), rngOf([0, 0, 0]));
+    hm.start(0); // starts looking at yaw 0, pitch 0
+    let now = HARD_DEFAULTS.encounterMinMs;
+    hm.tick(now, 0.016); // spawn at 70°
+    expect(hm.killerYaw()).toBeCloseTo(70, 6);
+    hm.applyLook(70, 5); // turn onto it (yaw 0→70) and tilt up 5° (within the 12° tol)
+    expect(hm.yaw).toBeCloseTo(70, 6);
+    for (let i = 0; i < 20 && hm.killerActive(); i++) {
+      now += 30;
+      hm.tick(now, 0.03);
+    }
+    expect(hm.spotted).toBe(1);
   });
 
   it('a stopped controller ignores ticks; empty metrics read safely', () => {

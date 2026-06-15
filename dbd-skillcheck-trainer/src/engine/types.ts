@@ -107,7 +107,8 @@ export interface Settings {
   hardEncounterMinS: number;
   hardEncounterMaxS: number;
   hardMissPenaltyPct: number;
-  hardPanSensitivity: number;
+  hardPanSensitivity: number; // mouse-look speed multiplier (FPS look + edge-pan fallback)
+  hardInvertY: boolean; // invert vertical mouse-look
   hardDangerCue: boolean;
   hardDangerCueIntensity: number;
 }
