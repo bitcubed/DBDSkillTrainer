@@ -81,7 +81,7 @@ export function loadSettings(storage: StorageLike): Settings {
     hardEncounterMinS: num(o.hardEncounterMinS, 3, 40, d.hardEncounterMinS),
     hardEncounterMaxS: num(o.hardEncounterMaxS, 4, 60, d.hardEncounterMaxS),
     hardMissPenaltyPct: num(o.hardMissPenaltyPct, 0, 25, d.hardMissPenaltyPct),
-    hardPanSensitivity: num(o.hardPanSensitivity, 0.4, 2.5, d.hardPanSensitivity),
+    hardPanSensitivity: num(o.hardPanSensitivity, 0.25, 2.5, d.hardPanSensitivity),
     hardInvertY: bool(o.hardInvertY, d.hardInvertY),
     hardDangerCue: bool(o.hardDangerCue, d.hardDangerCue),
     hardDangerCueIntensity: num(o.hardDangerCueIntensity, 0, 1, d.hardDangerCueIntensity),

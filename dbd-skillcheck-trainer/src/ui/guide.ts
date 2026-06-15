@@ -99,7 +99,7 @@ export const GUIDE_HTML = `
 
     <div class="gsec">
       <h4><span class="n">✦</span>Hard Mode — divided attention (killer lookout)</h4>
-      <p>The real test isn't hitting checks in a vacuum — it's hitting them <b>while watching for the killer</b>. Hard Mode puts you first-person at a generator: <b>click the scene to capture the mouse</b> and look around FPS-style — left/right <i>and</i> up/down (<b>ESC</b> frees the cursor; keyboard fallback is <b>◄►▲▼ / WASD</b> / Q-E). Hit checks with <b>Space</b>, and <b>catch the killer</b> by putting your reticle on it — roughly level with the ground — before it reaches you (~3s).</p>
+      <p>The real test isn't hitting checks in a vacuum — it's hitting them <b>while watching for the killer</b>. Hard Mode puts you first-person at a generator: <b>click the scene to capture the mouse</b> and look around FPS-style — left/right <i>and</i> up/down (<b>ESC</b> frees the cursor; keyboard fallback is <b>◄►▲▼ / WASD</b> / Q-E). Hit checks with <b>Space or left-click</b> (your Input setting applies), and <b>catch the killer</b> by putting your reticle on it — roughly level with the ground — before it reaches you (~3s).</p>
       <ul>
         <li>Trains <b>scanning</b> instead of tunnel-visioning the dial — the skill that actually keeps you alive.</li>
         <li>Spotting is scored as a <b>spotted rate</b>; getting caught costs a little gen progress (a scare) but the run continues.</li>

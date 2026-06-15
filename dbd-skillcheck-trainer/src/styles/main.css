@@ -56,6 +56,39 @@ select:focus,button:focus,input:focus,.tab:focus-visible,.chip:focus-visible{out
 .stage.needslook #lookPrompt{display:flex;}
 #lookPrompt .lp-icon{font-size:22px; letter-spacing:0;}
 #lookPrompt .lp-sub{font-size:9px; letter-spacing:.16em; color:var(--mut); font-weight:600;}
+
+/* In-window fullscreen ("fullscreen but in the window"): the stage fills the
+   viewport on top of the page; sizeCanvas() handles the dimensions. */
+body.sim-expanded{overflow:hidden;} /* drop the scrollbar so the sim fills edge-to-edge */
+.stage.expanded{position:fixed; inset:0; z-index:1000; border:none; border-radius:0;}
+
+/* Bottom-right fullscreen toggle. Hidden while the mouse is captured (can't click it). */
+.sim-corner-btn{position:absolute; right:10px; bottom:10px; z-index:6; width:34px; height:34px;
+  display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0;
+  border:1px solid var(--line); border-radius:7px; background:rgba(12,15,18,.62);
+  color:var(--ink); font-size:16px; line-height:1;}
+.sim-corner-btn:hover{border-color:#4a5560; background:rgba(20,26,30,.85);}
+.stage.looklocked .sim-corner-btn{display:none;}
+
+/* Top-left "Esc to exit" indicator, shown while the sim is immersive (captured or fullscreen). */
+#escHint{position:absolute; left:10px; top:10px; z-index:6; display:none; align-items:center; gap:6px;
+  padding:5px 9px; border-radius:6px; background:rgba(12,15,18,.62);
+  font-size:10px; letter-spacing:.16em; text-transform:uppercase; font-weight:700; color:var(--mut);
+  pointer-events:none;}
+.stage.immersive #escHint{display:flex;}
+#escHint .esc-key{padding:1px 6px; border:1px solid var(--line); border-radius:4px;
+  background:rgba(0,0,0,.4); color:var(--ink); font-weight:800; letter-spacing:.05em;}
+
+/* Small centered Start box, shown when the sim is idle. Clicking it starts the run
+   and (in Hard Mode) captures the mouse, so there's no second click into the sim.
+   A boxed panel (not a full-cover layer) so the corner controls stay clickable. */
+#startOverlay{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:7;
+  display:none; flex-direction:column; align-items:center; gap:10px;
+  padding:18px 26px 16px; border-radius:12px; border:1px solid var(--line);
+  background:rgba(10,13,16,.72);}
+.stage.idle #startOverlay{display:flex;}
+#startOverlay .btn.primary{font-size:15px; padding:13px 32px; letter-spacing:.22em;}
+#startOverlay .so-sub{font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:var(--mut);}
 #perkTags{position:absolute; top:10px; left:12px; display:flex; gap:6px; flex-wrap:wrap; pointer-events:none;}
 .ptag{font-size:9px; letter-spacing:.16em; text-transform:uppercase; font-weight:700;
   color:var(--gold); border:1px solid #4a4022; background:rgba(232,195,74,.07);

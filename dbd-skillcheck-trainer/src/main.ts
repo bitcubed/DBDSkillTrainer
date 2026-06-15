@@ -327,9 +327,17 @@ window.addEventListener('pagehide', () => endFreeplayRun(performance.now()));
 // ---------------- canvas sizing ----------------
 function sizeCanvas(): void {
   DPR = Math.min(window.devicePixelRatio || 1, 2);
-  W = stage.clientWidth;
-  H = Math.max(300, Math.min(Math.round(W * 0.56), 420));
-  stage.style.height = `${H}px`;
+  if (stage.classList.contains('expanded')) {
+    // In-window fullscreen: the stage is position:fixed inset:0, so let CSS drive
+    // the box and fill the canvas to the viewport.
+    stage.style.height = '';
+    W = stage.clientWidth;
+    H = stage.clientHeight;
+  } else {
+    W = stage.clientWidth;
+    H = Math.max(300, Math.min(Math.round(W * 0.56), 420));
+    stage.style.height = `${H}px`;
+  }
   cv.width = W * DPR;
   cv.height = H * DPR;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -447,7 +455,7 @@ function frame(now: number): void {
   session.tick(now);
   const inHard = hardModeActive() && session.running;
   if (inHard) hardMode.tick(now, dt);
-  syncLookPrompt(); // keep the capture prompt / cursor / auto-release in sync with run state
+  syncSimChrome(); // keep overlays / cursor / pointer-lock state in sync with the run
 
   // Background: Hard Mode's scene IS the backdrop, so hide the noise field there.
   if (inHard) {
@@ -530,9 +538,15 @@ function syncKeyPitch(): void {
 }
 
 window.addEventListener('keydown', (e) => {
-  // Space resolves checks. In Hard Mode the mouse is busy looking, so Space works
-  // regardless of the Input setting; otherwise honor it (idle Space stays native).
-  if (e.code === 'Space' && (ui.input !== 'mouse' || hardModeActive()) && session.running) {
+  // Esc exits the immersive sim: the browser releases pointer lock, and we collapse
+  // the in-window fullscreen too. The run keeps going (Stop is its own control).
+  if (e.code === 'Escape') {
+    setExpanded(false);
+    return; // don't preventDefault — let the browser do its native pointer-lock release
+  }
+  // Space resolves checks unless the Input setting is left-click-only — same rule in
+  // every mode, Hard Mode included (idle Space stays native).
+  if (e.code === 'Space' && ui.input !== 'mouse' && session.running) {
     e.preventDefault();
     // Judge at the event's own timestamp (when the key actually went down), not
     // after handler dispatch — tighter for the ~33 ms great window.
@@ -626,7 +640,7 @@ function requestLook(): void {
 // Belt-and-suspenders for engines that fire the event rather than rejecting.
 document.addEventListener('pointerlockerror', () => undefined);
 
-function syncLookPrompt(): void {
+function syncSimChrome(): void {
   const liveHard = hardModeActive() && session.running;
   // Release the mouse automatically when the hard run ends or the mode changes.
   if (lookLocked() && !liveHard) {
@@ -636,6 +650,11 @@ function syncLookPrompt(): void {
       // best-effort
     }
   }
+  const expanded = stage.classList.contains('expanded');
+  // Start overlay: only when nothing is running (a fresh sim, ready to begin).
+  stage.classList.toggle('idle', !session.running && !program.active);
+  // "Esc to exit" indicator: only when the sim is immersive (captured or fullscreen).
+  stage.classList.toggle('immersive', lookLocked() || expanded);
   // Show "click to capture" only while a hard run is live, the mouse is free, the
   // player isn't already driving by keyboard, and this is a mouse-primary device.
   stage.classList.toggle(
@@ -647,7 +666,7 @@ function syncLookPrompt(): void {
 
 document.addEventListener('pointerlockchange', () => {
   if (!lookLocked()) hardMode.setMousePan(0.5); // drop any residual edge-pan velocity
-  syncLookPrompt();
+  syncSimChrome();
 });
 
 // FPS deltas (fire on the locked element). movementY up is negative → +pitch (look
@@ -670,18 +689,22 @@ stage.addEventListener('pointerleave', () => {
   if (hardModeActive() && !lookLocked()) hardMode.setMousePan(0.5); // recenter → stop panning
 });
 
-// Left click (or tap) anywhere counts as a press — matches an M1 skill-check
-// bind. In Hard Mode the mouse is for looking: a click on the stage (re)captures
-// the pointer instead of resolving a check; clicks never resolve checks here.
+// Left click (or tap) anywhere counts as a press — matches an M1 skill-check bind.
+// Honors the Input dropdown (Space / Left click / Both) in every mode, Hard Mode
+// included. In Hard Mode the click ALSO (re)captures the pointer for FPS look, so
+// one click both looks and hits.
 document.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0 || !session.running) return;
+  if ((e.target as Element).closest('button,select,input,a,.chip,.tab')) return;
   if (hardModeActive()) {
-    if (session.running && e.button === 0 && !(e.target as Element).closest('button,select,input,a,.chip,.tab')) {
-      requestLook();
+    requestLook(); // capture the pointer for FPS look (no-op if already locked / touch)
+    if (ui.input !== 'space') {
+      e.preventDefault();
+      press(e.timeStamp || performance.now()); // no-op when no check is active
     }
     return;
   }
-  if (ui.input === 'space' || e.button !== 0 || !session.running) return;
-  if ((e.target as Element).closest('button,select,input,a,.chip,.tab')) return;
+  if (ui.input === 'space') return;
   e.preventDefault();
   press(e.timeStamp || performance.now());
 });
@@ -689,6 +712,9 @@ document.addEventListener('pointerdown', (e) => {
 // ---------------- session control ----------------
 function setStartBtn(): void {
   els.startBtn.textContent = session.running ? 'Stop' : 'Start';
+  // Start now lives on the in-sim overlay; the external button is the Stop control,
+  // shown only while a run is live (or a Program drives it).
+  els.startBtn.style.display = session.running || program.active ? '' : 'none';
 }
 function setProgBtn(): void {
   els.progBtn.textContent = program.active ? '■ Stop Program' : '▶ 5-Min Program';
@@ -720,6 +746,29 @@ function startStop(): void {
 els.startBtn.addEventListener('click', (e) => {
   e.stopPropagation();
   startStop();
+});
+// In-sim Start: clicking it starts the run AND (in Hard Mode) captures the mouse,
+// because startStop()'s requestLook() fires from this in-stage user gesture — so
+// there's no separate "click into the sim" step.
+$('simStartBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  startStop();
+});
+
+// ---------------- in-window fullscreen ("fullscreen but in the window") ----------------
+const fsBtn = $('fsBtn');
+function setExpanded(on: boolean): void {
+  if (stage.classList.contains('expanded') === on) return;
+  document.body.classList.toggle('sim-expanded', on); // drop the page scrollbar so it fills edge-to-edge
+  stage.classList.toggle('expanded', on);
+  fsBtn.textContent = on ? '🗗' : '⛶';
+  fsBtn.setAttribute('aria-label', on ? 'Exit fullscreen' : 'Fullscreen sim');
+  sizeCanvas(); // recompute the canvas for the new box size
+  syncSimChrome();
+}
+fsBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  setExpanded(!stage.classList.contains('expanded'));
 });
 els.resetBtn.addEventListener('click', (e) => {
   e.stopPropagation();
@@ -772,15 +821,19 @@ $('dashBtn').addEventListener('click', (e) => {
 
 // ---------------- mode UI helpers ----------------
 function updateHint(): void {
-  els.hint.textContent =
-    session.mode === 'hard'
-      ? 'MOUSE-LOOK (click to capture · ESC frees) — ◄►▲▼/WASD — SPACE to hit — spot the killer'
-      : HINTS[ui.input];
+  if (session.mode === 'hard') {
+    const hit = ui.input === 'space' ? 'SPACE' : ui.input === 'mouse' ? 'CLICK' : 'SPACE / CLICK';
+    els.hint.textContent = `MOUSE-LOOK (click to capture · ESC frees) — ◄►▲▼/WASD — ${hit} to hit — spot the killer`;
+  } else {
+    els.hint.textContent = HINTS[ui.input];
+  }
 }
 function syncModeUI(): void {
   els.specialRow.classList.toggle('show', session.mode === 'special');
   $('hardPanel').classList.toggle('show', session.mode === 'hard');
   els.pacingSel.disabled = !session.isRepair();
+  $('simStartSub').textContent =
+    session.mode === 'hard' ? 'Spot the killer while you repair' : 'Hit the skill checks';
   updateHint();
 }
 
@@ -1044,6 +1097,8 @@ function applySettingsToUi(): void {
 applySettingsToUi();
 dashboard.setRecords(loadHistory(storage));
 sizeCanvas();
+setStartBtn(); // hide the external Start (it now lives on the in-sim overlay)
+syncSimChrome(); // set initial idle/overlay state before the first frame
 updateStatsPanel(els, session);
 refreshChips(els, session);
 drawProgress();

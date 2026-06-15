@@ -3,6 +3,13 @@
 ## 0.4.0 — 2026-06-14 — Hard Mode: FPS mouse-look + DBD color grade
 
 ### Changed
+- **In-sim Start + immersive chrome.** Start now lives on a small overlay box
+  inside the sim (the external Start button is gone; it becomes the Stop control
+  while a run is live). Clicking Start begins the run and, in Hard Mode, captures
+  the mouse in the same gesture — no separate "click into the sim" step. Added an
+  **in-window fullscreen** toggle (bottom-right ⛶) that expands the sim to fill the
+  browser window, a top-left **"Esc — exit sim"** indicator while immersive, and
+  **Esc** both releases the captured mouse and collapses fullscreen.
 - **FPS mouse-look (pointer lock).** Hard Mode now captures and contains the
   cursor like a first-person shooter: **click the scene to capture** (raw mouse
   movement drives the view), **ESC** frees it. The old position-based edge-pan
@@ -20,6 +27,14 @@
   separating the killer. Purely decorative: result meaning still rides the palette
   and the killer reads by shape + outline, so the colorblind-safe contract is
   unchanged.
+
+- **Calmer look sensitivity.** Halved the base FPS mouse-look speed (default 1× now
+  turns ~8° per 100px of mouse movement, was ~16°) and widened the **Look
+  sensitivity** slider's low end to **0.25×** (down from 0.4×) for very slow aim.
+- **Input dropdown honored in Hard Mode.** Left-click now resolves skill checks in
+  Hard Mode per the Input setting (Space / Left click / Both), instead of forcing
+  Space-only. A stage left-click also (re)captures the pointer for FPS look, so one
+  click both looks and hits.
 
 ### Added
 - **Look sensitivity** slider (renamed from "Pan sensitivity") and an **Invert Y**

@@ -82,6 +82,8 @@ export const HARD_DEFAULTS = {
 } as const;
 
 // FPS mouse-look: degrees of view rotation per pixel of raw mouse movement while
-// the pointer is locked (scaled further by panSensitivity). Pixel-domain, so it
-// lives here rather than in HardConfig (which is pure angles for unit tests).
-export const HARD_LOOK_DEG_PER_PX = 0.16;
+// the pointer is locked (scaled further by panSensitivity, the "Look sensitivity"
+// slider). Pixel-domain, so it lives here rather than in HardConfig (which is pure
+// angles for unit tests). Tuned calm by default — ~180° needs a long swipe; the
+// slider (0.25×–2.5×) covers very-slow to twitchy.
+export const HARD_LOOK_DEG_PER_PX = 0.08;

@@ -45,7 +45,12 @@ warm hazy horizon, diffuse overcast light, warm amber/umber ground, olive foliag
 distant treeline, a warm ember ground glow, light warm vignette, warm killer backlight) —
 purely decorative: result meaning still rides the palette and the killer reads by shape +
 outline, so the colorblind-safe contract holds. New tunables: **Look sensitivity** (renamed
-from Pan) and **Invert Y**. Typecheck/lint clean, 143 tests, `vite build` clean.
+from Pan, calmer default + 0.25× low end) and **Invert Y**. The sim also gained an **in-sim
+Start overlay** (clicking Start runs + captures the mouse in one gesture; the external Start
+became the Stop control), an **in-window fullscreen** toggle (bottom-right; the stage goes
+`position:fixed` and `sizeCanvas()` fills the viewport), and a top-left **"Esc — exit sim"**
+indicator (Esc releases the mouse and collapses fullscreen). Typecheck/lint clean, 143 tests,
+`vite build` clean.
 
 **Update 2026-06-14 — audio embedded; dial reworked to 1:1.** The owner provided
 three skill-check recordings (check-appears / good / great) and screenshots. After
@@ -207,8 +212,9 @@ practice distribution maps directly onto it:
     characters); the scene's brighter overcast-autumn color grade is **decorative only**
     (result meaning rides the palette; the killer reads by shape + outline → colorblind-safe holds).
     Hard Mode uses **centered** gen checks (no Doctor off-centre) so the dial HUD sits at
-    screen center over the scene, and resolves checks with **Space** (the mouse is for
-    looking). **Look = pointer-lock FPS mouse-look** (cursor captured; yaw + clamped up/down
+    screen center over the scene, and honors the **Input dropdown** (Space / Left click /
+    Both) like every other mode — a stage left-click also (re)captures the pointer, so one
+    click both looks and hits. **Look = pointer-lock FPS mouse-look** (cursor captured; yaw + clamped up/down
     pitch; click to capture, ESC to release), with an edge-pan fallback for touch / when lock
     is unavailable and a full keyboard fallback (◄►▲▼ / WASD / Q-E). The catch needs the
     reticle on the killer in both axes (yaw cone + a generous "roughly level" pitch

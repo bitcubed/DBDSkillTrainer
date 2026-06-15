@@ -533,9 +533,17 @@ game engine math/feel is unchanged.
 - **Divergences (documented):**
   - **Centered dial.** Hard Mode runs centered generator checks (Doctor
     off-centre suppressed), so the dial HUD overlays the scene at screen center.
-  - **Space-to-hit.** The mouse is busy looking, so Space resolves checks
-    regardless of the Input setting; in this mode a stage click (re)captures the
-    pointer rather than resolving a check.
+  - **Input setting honored.** Hard Mode obeys the Input dropdown like every other
+    mode (Space / Left click / Both). A stage left-click ALSO (re)captures the
+    pointer for FPS look, so one click both looks and hits.
+  - **In-sim Start + immersive chrome.** Start lives on an in-stage overlay box
+    (shown when idle); clicking it runs the session and captures the mouse in one
+    gesture (the external Start button is hidden when idle, serving as Stop while
+    running). A bottom-right toggle gives **in-window fullscreen** (the stage goes
+    `position:fixed; inset:0`; `sizeCanvas()` fills the viewport and `body` scroll is
+    suppressed), a top-left indicator shows **Esc to exit**, and Esc releases the
+    pointer + collapses fullscreen. The dial radius is clamped (≤112px), so the HUD
+    stays sane at any size.
   - **Decorative color grade.** The scene's brighter overcast-autumn palette
     (slate-blue→warm-hazy sky gradient, diffuse overcast light, warm amber/umber
     ground, olive foliage + hazy treeline silhouettes, warm ember ground glow,

@@ -46,6 +46,12 @@
     </div>
     <div id="flash"><div id="flashMain"></div><div id="flashSub"></div></div>
     <div id="lookPrompt"><span class="lp-icon">🖱</span> Click to look around<span class="lp-sub">mouse-look · ESC frees the cursor · or ◄►▲▼ / WASD</span></div>
+    <div id="escHint"><span class="esc-key">Esc</span> exit sim</div>
+    <button id="fsBtn" class="sim-corner-btn" type="button" aria-label="Fullscreen sim" title="Fullscreen (within the window)">⛶</button>
+    <div id="startOverlay">
+      <button class="btn primary" id="simStartBtn" type="button">▶ Start</button>
+      <div class="so-sub" id="simStartSub">Hit the skill checks</div>
+    </div>
     <div id="hint">SPACE or LEFT CLICK anywhere to hit</div>
   </div>
 
@@ -132,7 +138,7 @@
       <div class="sl"><div class="lab"><span>Miss penalty</span><b id="vHardPenalty">5%</b></div>
         <input type="range" id="rHardPenalty" min="0" max="25" value="5" aria-label="Miss penalty"></div>
       <div class="sl"><div class="lab"><span>Look sensitivity</span><b id="vHardPan">1.00×</b></div>
-        <input type="range" id="rHardPan" min="40" max="250" value="100" aria-label="Look sensitivity"></div>
+        <input type="range" id="rHardPan" min="25" max="250" value="100" aria-label="Look sensitivity"></div>
       <div class="sl"><div class="lab"><span>Danger cue intensity</span><b id="vHardDanger">50%</b></div>
         <input type="range" id="rHardDanger" min="0" max="100" value="50" aria-label="Danger cue intensity"></div>
     </div>
